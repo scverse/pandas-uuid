@@ -1,0 +1,4 @@
+[project]
+name = "numeric-notebooks"
+version = "0.1.0"
+dependencies = ["numpy", "scipy", "pandas", "pyarrow"]
