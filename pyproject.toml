@@ -1,4 +1,3 @@
-[project]
-name = "numeric-notebooks"
-version = "0.1.0"
-dependencies = ["numpy", "scipy", "pandas", "pyarrow"]
+[tool.hatch.envs.default]
+detached = true
+dependencies = ["numpy", "scipy", "pandas", "pyarrow", "ipykernel"]
