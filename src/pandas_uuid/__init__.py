@@ -80,10 +80,10 @@ def _to_uuid_pyarrow(v: UuidLike) -> pa.UuidScalar:
         case UUID():
             return scalar(v.bytes, type=uuid())
         case bytes():
-            # TODO: pad?
+            # raises a pa.ArrowInvalid error if not 16 bytes
             return scalar(v, type=uuid())
         case int():
-            # TODO: verify byte order `big` is correct
+            # raises an OverflowError if v has >128 bits
             return scalar(v.to_bytes(16), type=uuid())
         case str():
             return _to_uuid_pyarrow(UUID(v))
@@ -164,7 +164,9 @@ class UuidExtensionArray(ExtensionArray):
             self._data = values.cast(uuid())
         elif (dtype is None and find_spec("pyarrow")) or (
             dtype is not None and dtype.storage == "pyarrow"
-        ):  # TODO: make this and the next branch more efficient
+        ):
+            # TODO: make this and the next branch more efficient
+            # https://github.com/scverse/pandas-uuid/issues/2
             from pyarrow import array, binary, uuid
 
             # cast because of https://github.com/apache/arrow/issues/48470
@@ -302,6 +304,7 @@ class UuidExtensionArray(ExtensionArray):
         result = method(other)
 
         # TODO: deal with `result` being NotImplemented
+        # https://github.com/scverse/pandas-uuid/issues/1
 
         return cast("BooleanArray", pd.array(result, dtype="boolean"))
 
