@@ -1,0 +1,22 @@
+{
+    "notebook.formatOnSave.enabled": true,
+    "notebook.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.organizeImports": "explicit",
+    },
+    "[python][json][jsonc]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "always",
+            "source.organizeImports": "always",
+        },
+    },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+    },
+    "[json][jsonc]": {
+        "editor.defaultFormatter": "biomejs.biome",
+    },
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": ["--color=yes"],
+}

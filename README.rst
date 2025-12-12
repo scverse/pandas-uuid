@@ -1,0 +1,2 @@
+Pandas ExtensionArray / ExtensionDType for UUID
+===============================================
