@@ -222,7 +222,14 @@ class UuidExtensionArray(ExtensionArray):
     @override
     def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:
         if isinstance(item, int | np.integer):
-            return UUID(bytes=self._data[item].tobytes())
+            match self._data[item]:
+                case pa.UuidScalar() as elem:
+                    return elem.as_py()
+                case np.bytes_() as elem:
+                    return UUID(bytes=elem.tobytes())
+                case elem:
+                    msg = f"Unknown type for Uuid: {type(elem)}"
+                    raise AssertionError(msg)
         item = check_array_indexer(self, item)
         return self._simple_new(self._data[item])
 
@@ -262,7 +269,9 @@ class UuidExtensionArray(ExtensionArray):
 
     @override
     def copy(self) -> Self:
-        return self._simple_new(self._data.copy())
+        return self._simple_new(
+            self._data.copy() if isinstance(self._data, np.ndarray) else self._data
+        )
 
     @override
     @classmethod
