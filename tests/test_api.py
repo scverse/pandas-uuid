@@ -46,3 +46,10 @@ else:
 )
 def test_construct(storage: UuidStorageKind, value: UuidLike) -> None:
     UuidExtensionArray([value], dtype=UuidDtype(storage))
+
+
+def test_isna(request: pytest.FixtureRequest, storage: UuidStorageKind) -> None:
+    if storage == "numpy":
+        request.applymarker(pytest.mark.xfail(raises=TypeError))
+    arr = UuidExtensionArray([uuid4(), uuid4(), None], dtype=UuidDtype(storage))
+    assert arr.isna().tolist() == [False, False, True]

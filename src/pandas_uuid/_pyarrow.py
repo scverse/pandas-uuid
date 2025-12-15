@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """Stub for pyarrow classes for instance checks if pyarrow is not installed."""
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ if TYPE_CHECKING or find_spec("pyarrow"):
         UuidArray,
         UuidScalar,
     )
-else:
+else:  # pragma: no cover
     Array = type("Array", (), dict(__module__="pyarrow"))
     ChunkedArray = type("ChunkedArray", (), dict(__module__="pyarrow"))
     DataType = type("DataType", (), dict(__module__="pyarrow"))
