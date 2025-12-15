@@ -25,7 +25,7 @@ if TYPE_CHECKING or find_spec("pyarrow"):
         UuidArray,
         UuidScalar,
     )
-else:
+else:  # pragma: no cover
     Array = type("Array", (), dict(__module__="pyarrow"))
     ChunkedArray = type("ChunkedArray", (), dict(__module__="pyarrow"))
     DataType = type("DataType", (), dict(__module__="pyarrow"))
