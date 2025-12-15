@@ -59,7 +59,7 @@ lint.per-file-ignores."**/*.ipynb" = [
   "CPY001", # Missing copyright notice in notebook is fine
   "I002",   # Missing `from __future__ import annotations` is fine
 ]
-lint.per-file-ignores."docs/conf.py" = [
+lint.per-file-ignores."docs/**/*.py" = [
   "INP001", # __init__.py
 ]
 lint.per-file-ignores."src/pandas_uuid/__main__.py" = [
