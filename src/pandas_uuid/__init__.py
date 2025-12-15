@@ -12,7 +12,6 @@ from uuid import UUID
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 from pandas.api.extensions import ExtensionArray, ExtensionDtype
 from pandas.api.indexers import check_array_indexer
 from pandas.core.algorithms import take
@@ -23,8 +22,13 @@ from . import _pyarrow as pa
 if TYPE_CHECKING:
     import builtins
     from collections.abc import Iterable
-    from typing import Literal, Self
+    from typing import Literal, Self, TypeAlias
 
+    import numpy.typing as npt
+
+    npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
+
+    from numpy.typing import NDArray
     from pandas._libs.missing import NAType
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
     from pandas.core.arrays import BooleanArray
@@ -40,9 +44,11 @@ __all__ = [
 ]
 
 
-type UuidStorageKind = Literal["numpy", "pyarrow"]
-type UuidStorage = NDArray[np.void] | pa.UuidArray
-type UuidLike = UUID | pa.UuidScalar | bytes | int | str
+# TODO: remove noqa when myst-parser supports sphinx 9
+# https://github.com/executablebooks/MyST-Parser/pull/1076
+UuidStorageKind: TypeAlias = 'Literal["numpy", "pyarrow"]'  # noqa: UP040
+UuidStorage: TypeAlias = "NDArray[np.void] | pa.UuidArray"  # noqa: UP040
+UuidLike: TypeAlias = "UUID | pa.UuidScalar | bytes | int | str"  # noqa: UP040
 
 # 16 void bytes: 128 bit, every pattern valid, no funky behavior like 0 stripping.
 UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
@@ -67,7 +73,7 @@ def _to_uuid_numpy(v: UuidLike) -> UUID:
             return UUID(int=v)
         case str():
             return UUID(v)
-    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
+    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike)}"
     raise TypeError(msg)
 
 
@@ -87,7 +93,7 @@ def _to_uuid_pyarrow(v: UuidLike) -> pa.UuidScalar:
             return scalar(v.to_bytes(16), type=uuid())
         case str():
             return _to_uuid_pyarrow(UUID(v))
-    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
+    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike)}"
     raise TypeError(msg)
 
 
@@ -103,11 +109,15 @@ class UuidDtype(ExtensionDtype):
     # ExtensionDtype essential API (3 class attrs and methods)
 
     name: ClassVar[str] = "uuid"
+    """The canonical name of the dtype."""
+
     type: ClassVar[builtins.type[UUID]] = UUID
+    """The Python type associated with the dtype."""
 
     @classmethod
     @override
     def construct_array_type(cls) -> type[UuidExtensionArray]:
+        """Return the array type associated with this dtype."""
         return UuidExtensionArray
 
     # ExtensionDtype overrides
@@ -117,14 +127,16 @@ class UuidDtype(ExtensionDtype):
     def kind(self) -> Literal["O", "V"]:
         """Return the dtype’s kind.
 
-        Should be `"V"`, but `"O"` is used because of
-        <https://github.com/pandas-dev/pandas/issues/54810>
+        Should be `"V"`, but `"O"` is used because of `pandas-dev/pandas#54810`_.
+
+        .. _pandas-dev/pandas#54810: https://github.com/pandas-dev/pandas/issues/54810
         """
         return "O"
 
     @property
     @override
     def na_value(self) -> NAType:
+        """Returns :attr:`pandas.NA`, i.e. this dtype has missing value semantics."""
         return pd.NA
 
     # IO
@@ -143,7 +155,7 @@ class UuidExtensionArray(ExtensionArray):
 
     def __init__(
         self,
-        values: Iterable[UuidLike],
+        values: Iterable[UuidLike | NAType | None],
         *,
         copy: bool = False,
         dtype: UuidDtype | None = None,
@@ -171,11 +183,16 @@ class UuidExtensionArray(ExtensionArray):
 
             # cast because of https://github.com/apache/arrow/issues/48470
             self._data = array(
-                [_to_uuid_pyarrow(x).cast(binary(16)) for x in values], type=uuid()
+                [
+                    None if pd.isna(x) else _to_uuid_pyarrow(x).cast(binary(16))
+                    for x in values
+                ],
+                type=uuid(),
             )
         else:
             self._data = np.array(
-                [_to_uuid_numpy(x).bytes for x in values], dtype=UUID_NP_STORAGE_DTYPE
+                [_to_uuid_numpy(x).bytes for x in values],
+                dtype=UUID_NP_STORAGE_DTYPE,
             )
 
         if getattr(self._data, "ndim", 1) != 1:
@@ -191,6 +208,7 @@ class UuidExtensionArray(ExtensionArray):
     @property
     @override
     def dtype(self) -> UuidDtype:
+        """Return the dtype with info about this array’s storage type."""
         match self._data:
             case pa.Array():
                 return UuidDtype(storage="pyarrow")
@@ -223,6 +241,7 @@ class UuidExtensionArray(ExtensionArray):
     def __getitem__(self, item: SequenceIndexer) -> Self: ...
     @override
     def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:
+        """Get the item(s) at position(s) `item`."""
         if isinstance(item, int | np.integer):
             match self._data[item]:
                 case pa.UuidScalar() as elem:
@@ -245,20 +264,24 @@ class UuidExtensionArray(ExtensionArray):
 
     @override
     def __len__(self) -> int:
+        """Return the length of the array."""
         return len(self._data)
 
     @unpack_zerodim_and_defer("__eq__")
     @override
     def __eq__(self, other: object) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Check element-wise equality with `other`."""
         return self._cmp("eq", other)
 
     @property
     @override
     def nbytes(self) -> int:
+        """Return the number of bytes needed to store this object in memory."""
         return self._data.nbytes
 
     @override
     def isna(self) -> NDArray[np.bool_]:
+        """Return a mask indicating which elements are missing."""
         return pd.isna(self._data)
 
     @override
@@ -269,6 +292,7 @@ class UuidExtensionArray(ExtensionArray):
         allow_fill: bool = False,
         fill_value: UUID | NAType | None = None,
     ) -> Self:
+        """See :meth:`~pandas.api.extensions.ExtensionArray.take`."""
         if allow_fill and fill_value is None:
             fill_value = self.dtype.na_value
 
@@ -277,6 +301,7 @@ class UuidExtensionArray(ExtensionArray):
 
     @override
     def copy(self) -> Self:
+        """Return a copy of the array."""
         return self._simple_new(
             self._data.copy() if isinstance(self._data, np.ndarray) else self._data
         )
@@ -285,6 +310,13 @@ class UuidExtensionArray(ExtensionArray):
     @classmethod
     def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # pyright: ignore[reportGeneralTypeIssues]
         return cls._simple_new(np.concatenate([x._data for x in to_concat]))  # noqa: SLF001
+
+    # Other overrides
+
+    @property
+    @override
+    def shape(self) -> tuple[int, ...]:
+        return (len(self),)
 
     # Helpers
 

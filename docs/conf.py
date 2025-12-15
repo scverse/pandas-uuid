@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """Configuration file for the Sphinx documentation builder.
 
 See <https://www.sphinx-doc.org/en/master/usage/configuration.html>.
@@ -17,9 +18,9 @@ sys.path.insert(0, str(HERE / "extensions"))
 
 # -- Project information -----------------------------------------------------
 
-project_name = "pandas-uuid"  # matches GitHub repo name and distribution name
-info = metadata(project_name)
-author = info["Author"]
+project = "pandas-uuid"  # matches GitHub repo name and distribution name
+info = metadata(project)
+author = info["Author-Email"].split('"')[1]
 copyright = f"{datetime.now(tz=UTC):%Y}, {author}."  # noqa: A001
 version = info["Version"]
 urls = dict(pu.split(", ") for pu in info.get_all("Project-URL"))
@@ -28,14 +29,13 @@ repository_url = urls["Source"]
 # The full version, including alpha/beta/rc tags
 release = info["Version"]
 
-bibtex_bibfiles = ["references.bib"]
 templates_path = ["_templates"]
 nitpicky = True  # Warn about broken links
 
 html_context = {
     "display_github": True,  # Integrate GitHub
     "github_user": "scverse",
-    "github_repo": project_name,
+    "github_repo": project,
     "github_version": "main",
     "conf_py_path": "/docs/",
 }
@@ -51,17 +51,18 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
-    "sphinxcontrib.bibtex",
     "sphinx_autodoc_typehints",
     "sphinx_tabs.tabs",
-    "sphinx.ext.mathjax",
-    "IPython.sphinxext.ipython_console_highlighting",
     "sphinxext.opengraph",
     *[p.stem for p in (HERE / "extensions").glob("*.py")],
 ]
 
 autosummary_generate = True
 autodoc_member_order = "groupwise"
+autodoc_default_options = {
+    "inherited-members": False,
+    "show-inheritance": True,
+}
 default_role = "literal"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
@@ -83,6 +84,8 @@ nb_execution_mode = "off"
 nb_merge_streams = True
 typehints_defaults = "braces"
 
+suppress_warnings = ["mystnb.unknown_mime_type"]
+
 source_suffix = {
     ".rst": "restructuredtext",
     ".ipynb": "myst-nb",
@@ -93,7 +96,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "pandas": ("https://pandas.pydata.org/pandas-docs/stable", None),
-    "pyarrow": ("https://arrow.apache.org/docs/python/", None),
+    "pyarrow": ("https://arrow.apache.org/docs", None),
 }
 
 # List of patterns, relative to source directory, that match files and
@@ -111,7 +114,7 @@ html_theme = "sphinx_book_theme"
 html_static_path = ["_static"]
 # html_css_files = ["css/custom.css"]  # noqa: ERA001
 
-html_title = project_name
+html_title = project
 
 html_theme_options = {
     "repository_url": repository_url,

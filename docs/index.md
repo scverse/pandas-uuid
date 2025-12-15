@@ -1,5 +1,4 @@
 ```{include} ../README.md
-
 ```
 
 ```{toctree}
@@ -7,9 +6,5 @@
 :maxdepth: 1
 
 api.md
-changelog.md
-template_usage.md
-contributing.md
-
 notebooks/example
 ```

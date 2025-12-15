@@ -4,7 +4,7 @@
 .. module:: pandas_uuid
 
 ..  autosummary::
-    :toctree: generated
+    :toctree: .
 
     UuidDtype
     UuidExtensionArray

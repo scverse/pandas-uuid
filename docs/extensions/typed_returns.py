@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """Sphinx extension for typed returns in docstrings."""
 
 # code from https://github.com/theislab/scanpy/blob/master/docs/extensions/typed_returns.py

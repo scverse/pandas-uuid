@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """Stub for pyarrow classes for instance checks if pyarrow is not installed."""
 
 from __future__ import annotations

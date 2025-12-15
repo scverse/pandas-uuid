@@ -4,25 +4,26 @@ requires = ["hatch-docstring-description", "hatch-vcs", "hatchling"]
 
 [project]
 name = "pandas-uuid"
-readme = "README.rst"
+readme = "README.md"
 license = "MPL-2.0"
 authors = [{ name = "Philipp A.", email = "flying-sheep@web.de" }]
 requires-python = ">=3.12"
 dynamic = ["description", "version"]
 dependencies = ["numpy", "pandas"]
 optional-dependencies.pyarrow = ["pyarrow"]
+urls.Source = "https://github.com/scverse/pandas-uuid"
+urls.Documentation = "https://icb-pandas-uuid.readthedocs.io/"
 
 [dependency-groups]
 doc = [
   "ipykernel",
-  "ipython",
+  "matplotlib",               # social cards
   "myst-nb",
   "sphinx>=8.1",
   "sphinx-autodoc-typehints",
   "sphinx-book-theme",
   "sphinx-copybutton",
   "sphinx-tabs",
-  "sphinxcontrib-bibtex",
   "sphinxext-opengraph",
 ]
 typing = ["pyarrow-stubs"]
@@ -31,8 +32,12 @@ typing = ["pyarrow-stubs"]
 [tool.hatch.version]
 source = "vcs"
 
+[tool.hatch.envs.default]
+installer = "uv"
+dependency-groups = ["typing"]
+
 [tool.hatch.envs.docs]
-dependency-groups = ["doc"]
+dependency-groups = ["typing", "doc"]
 scripts.build = "sphinx-build -M html docs docs/_build -W {args}"
 scripts.open = "python -m webbrowser -t docs/_build/html/index.html"
 scripts.clean = "git clean -fdX -- {args:docs}"

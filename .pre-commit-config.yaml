@@ -8,10 +8,10 @@ repos:
     -   id: ruff-check
         args: ["--fix"]
     -   id: ruff-format
-    # The following can be removed once PLR0917 is out of preview
+    # The following can be removed once these rules are out of preview
     -   name: ruff preview rules
         id: ruff-check
-        args: ["--preview", "--select=PLR0917"]
+        args: ["--preview", "--select=CPY,PLR0917"]
 -   repo: https://github.com/biomejs/pre-commit
     rev: v2.3.8
     hooks:
