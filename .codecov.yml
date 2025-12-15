@@ -1,0 +1,10 @@
+# Based on pydata/xarray
+codecov:
+  require_ci_to_pass: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: 75 # % minimum
+    changes: false
