@@ -7,6 +7,7 @@ from importlib.util import find_spec
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import pandas as pd
 import pytest
 
 from pandas_uuid import UuidDtype, UuidExtensionArray
@@ -14,8 +15,10 @@ from pandas_uuid import UuidDtype, UuidExtensionArray
 if TYPE_CHECKING:
     from pandas_uuid import UuidLike, UuidStorageKind
 
+HAS_PYARROW = find_spec("pyarrow")
+
 skipif_no_pyarrow = pytest.mark.skipif(
-    not find_spec("pyarrow"), reason="pyarrow is not installed"
+    not HAS_PYARROW, reason="pyarrow is not installed"
 )
 
 
@@ -34,6 +37,12 @@ else:
     pa_uuid = pa.scalar(b"\x01" * 16, type=pa.uuid())
 
 
+def test_default_storage() -> None:
+    dtype = UuidDtype()
+    assert dtype.storage == ("pyarrow" if HAS_PYARROW else "numpy")
+    assert dtype.na_value is pd.NA
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -46,6 +55,11 @@ else:
 )
 def test_construct(storage: UuidStorageKind, value: UuidLike) -> None:
     UuidExtensionArray([value], dtype=UuidDtype(storage))
+
+
+def test_construct_error(storage: UuidStorageKind) -> None:
+    with pytest.raises(TypeError):
+        UuidExtensionArray([()], dtype=UuidDtype(storage))  # pyright: ignore[reportArgumentType]
 
 
 def test_isna(request: pytest.FixtureRequest, storage: UuidStorageKind) -> None:

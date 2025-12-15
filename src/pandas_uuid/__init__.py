@@ -55,7 +55,7 @@ UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
 
 
 @cache
-def default_storage_kind() -> UuidStorageKind:
+def _default_storage_kind() -> UuidStorageKind:
     if find_spec("pyarrow"):
         return "pyarrow"
     return "numpy"
@@ -103,7 +103,7 @@ class UuidDtype(ExtensionDtype):
 
     # Custom
 
-    storage: UuidStorageKind = field(default_factory=default_storage_kind)
+    storage: UuidStorageKind = field(default_factory=_default_storage_kind)
     """Storage kind, either `"numpy"` or `"pyarrow"`."""
 
     # ExtensionDtype essential API (3 class attrs and methods)
