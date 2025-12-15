@@ -23,10 +23,8 @@ jobs:
     outputs:
       envs: ${{ steps.get-envs.outputs.envs }}
     steps:
-      - uses: actions/checkout@v5
-        with:
-          filter: blob:none
-          fetch-depth: 0
+      - uses: actions/checkout@v6
+        with: { filter: 'blob:none', fetch-depth: 0 }
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Get test environments
@@ -64,7 +62,7 @@ jobs:
         with:
           python-version: ${{ matrix.env.python }}
       - name: create hatch environment
-        run: uvx hatch env create ${{ matrix.env.name }}
+        run: uvx hatch -v env create ${{ matrix.env.name }}
       - name: run tests using hatch
         run: uvx hatch run ${{ matrix.env.name }}:run-cov -v --color=yes -n auto
       - name: generate coverage report
