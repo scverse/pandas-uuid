@@ -233,6 +233,12 @@ class UuidExtensionArray(ExtensionArray):
                     msg = f"Unknown type for Uuid: {type(elem)}"
                     raise AssertionError(msg)
         item = check_array_indexer(self, item)
+        if (
+            isinstance(item, np.ndarray)
+            and item.dtype.kind == "b"
+            and isinstance(self._data, pa.Array | pa.ChunkedArray)
+        ):
+            return self._simple_new(self._data.filter(item))
         return self._simple_new(self._data[item])
 
     # def __setitem__(self, index, value):
@@ -310,11 +316,19 @@ class UuidExtensionArray(ExtensionArray):
 
     # IO
 
-    def __arrow_array__(self, type: pa.DataType | None = None) -> pa.ExtensionArray:  # noqa: A002
-        """Convert the underlying array values to a pyarrow Array."""
+    def __arrow_array__(
+        self,
+        type: pa.DataType | None = None,  # noqa: A002
+    ) -> pa.Array | pa.ChunkedArray:
+        """Convert the underlying array values to a pyarrow Array.
+
+        See :ref:`pyarrow:arrow_array_protocol`.
+        """
         import pyarrow as pa
 
         if type is None:
             type = pa.uuid()  # noqa: A001
 
+        if isinstance(self._data, pa.Array | pa.ChunkedArray):
+            return self._data.cast(type)
         return pa.array(self._data, type=type)

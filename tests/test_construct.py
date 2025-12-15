@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MPL-2.0
 """Test constructing a UuidExtensionArray in various ways."""
 
 from __future__ import annotations
