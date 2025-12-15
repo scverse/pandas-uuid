@@ -53,7 +53,14 @@ deps = ["pre"]
 dependency-groups = ["typing"]
 extra-dependencies = ["ipykernel"]
 [tool.hatch.envs.hatch-test.overrides]
-matrix.extras.features = [{ if = ["pyarrow"], value = "pyarrow" }]
+matrix.extras.features = [{ value = "pyarrow", if = ["pyarrow"] }]
+# weirdly, uv pulls in pyarrow unless that constraint is specified,
+# but seems to have no problem to just leave it out. why?
+matrix.extras.env-vars = [
+  { key = "UV_CONSTRAINT", value = ".github/no-pyarrow.txt", if = [
+    "none",
+  ] },
+]
 matrix.deps.env-vars = [
   { key = "UV_PRERELEASE", value = "allow", if = [
     "pre",
