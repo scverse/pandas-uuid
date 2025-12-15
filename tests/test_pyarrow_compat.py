@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-"""Test pyarrow compatibility."""
+"""Test pyarrow integration."""
 
 from __future__ import annotations
 
@@ -16,15 +16,28 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_roundtrip() -> None:
+def test_pandas_to_pyarrow() -> None:
+    """`pa.array(ext_array)` should call `ext_array.__arrow_array__()`."""
     import pyarrow as pa
 
-    pd_arr = pd.array([uuid4()], dtype=UuidDtype())
+    pd_arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype("pyarrow"))
     assert isinstance(pd_arr, UuidExtensionArray)
+    assert isinstance(pd_arr._data, pa.Array)  # noqa: SLF001
 
-    # without `type=`, this would convert to a generic pandas ArrowExtensionArray
-    pa_arr = pa.Array.from_pandas(pd_arr, type=pa.uuid())
+    pa_arr = pa.array(pd_arr)  # pyright: ignore[reportArgumentType, reportCallIssue]
+
     assert pa_arr.type == pa.uuid()
+    assert [e.as_py() for e in pa_arr] == list(pd_arr)
 
-    pd_ser = pa_arr.to_pandas()
-    assert pd.testing.assert_extension_array_equal(pd_arr, pd_ser.array)
+
+def test_pyarrow_to_pandas() -> None:
+    """`pd.array(arr, dtype=UuidDtype())` should call `dtype.__from_arrow__(arr)`."""
+    import pyarrow as pa
+
+    data = [b"\x01" * 16, b"\x02" * 16]
+
+    pa_arr = pa.array(data, type=pa.uuid())
+
+    pd_ser = pd.Series(pa_arr, dtype=UuidDtype())
+    expected = pd.array(data, dtype=UuidDtype("pyarrow"))
+    pd.testing.assert_extension_array_equal(pd_ser.array, expected)
