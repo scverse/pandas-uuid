@@ -19,24 +19,18 @@ typing = ["pyarrow-stubs"]
 [tool.hatch.version]
 source = "vcs"
 
-# Test the lowest and highest supported Python versions with normal deps
 [[tool.hatch.envs.hatch-test.matrix]]
-deps = ["stable"]
-python = ["3.11", "3.14"]
-
-# Test the newest supported Python version also with pre-release deps
+python = ["3.14", "3.12"]
+extras = ["pyarrow", "none"]
 [[tool.hatch.envs.hatch-test.matrix]]
-deps = ["pre"]
 python = ["3.14"]
-
+deps = ["pre"]
+extras = ["pyarrow"]
 [tool.hatch.envs.hatch-test]
 dependency-groups = ["typing"]
 extra-dependencies = ["ipykernel"]
-[[tool.hatch.envs.hatch-test.matrix]]
-python = ["3.14", "3.12"]
-deps = ["pyarrow", "none"]
 [tool.hatch.envs.hatch-test.overrides]
-matrix.deps.features = [{ if = ["pyarrow"], value = "pyarrow" }]
+matrix.extras.features = [{ if = ["pyarrow"], value = "pyarrow" }]
 matrix.deps.env-vars = [
   { key = "UV_PRERELEASE", value = "allow", if = [
     "pre",
