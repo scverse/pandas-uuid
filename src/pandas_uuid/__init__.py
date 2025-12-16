@@ -134,7 +134,10 @@ class UuidDtype(ExtensionDtype):
     # IO
 
     def __from_arrow__(self, array: pa.Array | pa.ChunkedArray) -> UuidExtensionArray:
-        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
+        """PyArrow extension API for :meth:`pyarrow.Array.to_pandas`.
+
+        Incomplete because :meth:`pyarrow.UuidType.to_pandas_dtype`
+        does not refer to this (see :ref:`pyarrow:conversion-to-pandas`).
 
         See :ref:`pyarrow-integration` for an example.
         """
@@ -339,7 +342,7 @@ class UuidExtensionArray(ExtensionArray):
         self,
         type: pa.DataType | None = None,  # noqa: A002
     ) -> pa.Array | pa.ChunkedArray:
-        """Convert the underlying array values to a pyarrow Array.
+        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
 
         See :ref:`pyarrow-integration` for an example
         and :ref:`pyarrow:arrow_array_protocol` for details.

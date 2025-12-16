@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 from importlib.util import find_spec
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pandas as pd
 import pytest
 
 from pandas_uuid import UuidDtype, UuidExtensionArray
+
+if TYPE_CHECKING:
+    from typing import Literal
+
 
 pytestmark = pytest.mark.skipif(
     not find_spec("pyarrow"), reason="pyarrow not installed"
@@ -30,7 +35,8 @@ def test_pandas_to_pyarrow() -> None:
     assert [e.as_py() for e in pa_arr] == list(pd_arr)
 
 
-def test_pyarrow_to_pandas() -> None:
+@pytest.mark.parametrize("api", ["pyarrow", "pandas"])
+def test_pyarrow_to_pandas(api: Literal["pyarrow", "pandas"]) -> None:
     """`pd.array(arr, dtype=UuidDtype())` should call `dtype.__from_arrow__(arr)`."""
     import pyarrow as pa
 
@@ -38,6 +44,12 @@ def test_pyarrow_to_pandas() -> None:
 
     pa_arr = pa.array(data, type=pa.uuid())
 
-    pd_ser = pd.Series(pa_arr, dtype=UuidDtype())
+    match api:
+        case "pandas":
+            pd_ser = pd.Series(pa_arr, dtype=UuidDtype())
+        case "pyarrow":
+            pd_ser = pa_arr.to_pandas(types_mapper={pa.uuid(): UuidDtype()}.get)
+        case api:
+            pytest.fail(f"Unknown api: {api}")
     expected = pd.array(data, dtype=UuidDtype("pyarrow"))
     pd.testing.assert_extension_array_equal(pd_ser.array, expected)
