@@ -13,8 +13,8 @@ API
 ---
 
 ..  autosummary::
-    pandas_uuid.UuidDtype
     pandas_uuid.UuidExtensionArray
+    pandas_uuid.UuidDtype
     pandas_uuid.UuidStorage
     pandas_uuid.UuidLike
 
