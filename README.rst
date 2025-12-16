@@ -14,18 +14,21 @@ Pandas ExtensionArray / ExtensionDType for UUID
 Usage
 -----
 
+.. usage-start
+
 Use `UuidDtype` as a `pandas` extension dtype:
 
 >>> from uuid import uuid4
 >>> import pandas as pd
 >>> from pandas_uuid import UuidDtype
 >>>
->>> pd.Series([uuid4()], dtype=UuidDtype())
-0    7c1cde80-78ba-4f02-9565-adea3f9d6788
+>>> s = pd.Series([uuid4()], dtype=UuidDtype())
+>>> s
+0    e8f04c2e-ed42-488e-9e96-fe6c80d06bf6
 dtype: uuid
 
 .. usage-end
 
-For advanced usage, see the Examples_ notebook.
+For advanced usage, see the Documentation_.
 
-.. _Examples: https://icb-pandas-uuid.readthedocs-hosted.com/en/latest/notebooks/example.html
+.. _documentation: https://icb-pandas-uuid.readthedocs-hosted.com/en/latest/#usage

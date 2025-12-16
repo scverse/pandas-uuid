@@ -7,11 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, ClassVar, cast, get_args, overload, override
+from typing import TYPE_CHECKING, ClassVar, Literal, cast, get_args, overload, override
 from uuid import UUID
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 from pandas.api.extensions import ExtensionArray, ExtensionDtype
 from pandas.api.indexers import check_array_indexer
 from pandas.core.algorithms import take
@@ -22,13 +23,12 @@ from . import _pyarrow as pa
 if TYPE_CHECKING:
     import builtins
     from collections.abc import Iterable
-    from typing import Literal, Self
+    from typing import Self
 
     import numpy.typing as npt
 
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
 
-    from numpy.typing import NDArray
     from pandas._libs.missing import NAType
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
     from pandas.core.arrays import BooleanArray
@@ -134,7 +134,10 @@ class UuidDtype(ExtensionDtype):
     # IO
 
     def __from_arrow__(self, array: pa.Array | pa.ChunkedArray) -> UuidExtensionArray:
-        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`."""
+        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
+
+        See :ref:`pyarrow-integration` for an example.
+        """
         return UuidExtensionArray(array)
 
 
@@ -155,16 +158,6 @@ class UuidExtensionArray(ExtensionArray):
         """Initialize the array from an iterable of UUIDs.
 
         Constructing from a :type:`UuidStorage` is fast.
-
-        Parameters
-        ----------
-        values
-            Iterable of UUIDs.
-        copy
-            Copy the data.
-        dtype
-            Allows to parameterize the dtype.
-
         """
         if isinstance(values, np.ndarray):
             if dtype is not None and dtype.storage != "numpy":
@@ -348,7 +341,8 @@ class UuidExtensionArray(ExtensionArray):
     ) -> pa.Array | pa.ChunkedArray:
         """Convert the underlying array values to a pyarrow Array.
 
-        See :ref:`pyarrow:arrow_array_protocol`.
+        See :ref:`pyarrow:arrow_array_protocol` and
+        :ref:`pyarrow-integration` for an example.
         """
         import pyarrow as pa
 

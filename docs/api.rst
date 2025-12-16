@@ -1,5 +1,5 @@
-``pandas_uuid``
-===============
+``pandas_uuid`` API
+===================
 
 ..  module:: pandas_uuid
 

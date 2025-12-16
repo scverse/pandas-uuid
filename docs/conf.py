@@ -11,7 +11,6 @@ import sys
 from datetime import UTC, datetime
 from importlib.metadata import metadata
 from pathlib import Path
-from pickletools import TAKEN_FROM_ARGUMENT8U
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE / "extensions"))
@@ -51,10 +50,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
-    "sphinx_autodoc_typehints",
     "sphinx_tabs.tabs",
     "sphinxext.opengraph",
-    "scanpydoc.definition_list_typed_field",
     *[p.stem for p in (HERE / "extensions").glob("*.py")],
 ]
 
@@ -69,11 +66,10 @@ napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = False
 napoleon_use_rtype = True  # having a separate entry generally helps readability
-napoleon_use_param = TAKEN_FROM_ARGUMENT8U
+napoleon_use_param = True
 nb_output_stderr = "remove"
 nb_execution_mode = "off"
 nb_merge_streams = True
-typehints_defaults = "braces"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -87,6 +83,11 @@ intersphinx_mapping = {
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
+
+# Fix up undocumented types using the `resolve_from_map` extension
+type_map = {
+    ("py", "class", "NAType"): ("attr", "pandas.NA"),
+}
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -107,8 +108,3 @@ html_theme_options = {
 }
 
 pygments_style = "default"
-
-nitpick_ignore = [
-    ("py:class", "pandas._libs.missing.NAType"),
-    ("py:class", "pandas_uuid.TypeAliasType"),
-]

@@ -21,10 +21,8 @@ urls.Documentation = "https://icb-pandas-uuid.readthedocs.io/"
 [dependency-groups]
 doc = [
   "ipykernel",
-  "matplotlib",               # social cards
-  "scanpydoc",
+  "matplotlib",          # social cards
   "sphinx>=9.0.4",
-  "sphinx-autodoc-typehints",
   "sphinx-book-theme",
   "sphinx-copybutton",
   "sphinx-tabs",
@@ -74,6 +72,8 @@ src = ["src"]
 extend-include = ["*.ipynb"]
 format.docstring-code-format = true
 lint.select = ["ALL"]
+# prevent preview rules from getting removed by RUF100
+lint.external = ["CPY", "PLR0917"]
 lint.ignore = [
   "B019",    # functools.cache is fine to use
   "C408",    # dict(...) calls are good
