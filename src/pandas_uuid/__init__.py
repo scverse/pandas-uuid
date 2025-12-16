@@ -7,11 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, ClassVar, cast, get_args, overload, override
+from typing import TYPE_CHECKING, ClassVar, Literal, cast, get_args, overload, override
 from uuid import UUID
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 from pandas.api.extensions import ExtensionArray, ExtensionDtype
 from pandas.api.indexers import check_array_indexer
 from pandas.core.algorithms import take
@@ -22,40 +23,35 @@ from . import _pyarrow as pa
 if TYPE_CHECKING:
     import builtins
     from collections.abc import Iterable
-    from typing import Literal, Self, TypeAlias
+    from typing import Self
 
     import numpy.typing as npt
 
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
 
-    from numpy.typing import NDArray
     from pandas._libs.missing import NAType
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
     from pandas.core.arrays import BooleanArray
 
 
-__all__ = [
-    "UUID_NP_STORAGE_DTYPE",
-    "UuidDtype",
-    "UuidExtensionArray",
-    "UuidLike",
-    "UuidStorage",
-    "UuidStorageKind",
-]
+__all__ = ["UuidDtype", "UuidExtensionArray", "UuidLike", "UuidStorage"]
 
 
-# TODO: remove noqa when myst-parser supports sphinx 9
-# https://github.com/executablebooks/MyST-Parser/pull/1076
-UuidStorageKind: TypeAlias = 'Literal["numpy", "pyarrow"]'  # noqa: UP040
-UuidStorage: TypeAlias = "NDArray[np.void] | pa.UuidArray"  # noqa: UP040
-UuidLike: TypeAlias = "UUID | pa.UuidScalar | bytes | int | str"  # noqa: UP040
+type UuidStorage = Literal["numpy", "pyarrow"]
+"""Supported storage backend for :class:`~pandas_uuid.UuidDtype`."""
+type UuidLike = UUID | pa.UuidScalar | bytes | int | str
+"""Supported element types when creating a :class:`~pandas_uuid.UuidExtensionArray` \
+from a sequence.
+"""
+type _UuidStorageArray = NDArray[np.void] | pa.UuidArray
+
 
 # 16 void bytes: 128 bit, every pattern valid, no funky behavior like 0 stripping.
-UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
+_UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
 
 
 @cache
-def default_storage_kind() -> UuidStorageKind:
+def default_storage_kind() -> UuidStorage:
     if find_spec("pyarrow"):
         return "pyarrow"
     return "numpy"
@@ -73,7 +69,7 @@ def _to_uuid_numpy(v: UuidLike) -> UUID:
             return UUID(int=v)
         case str():
             return UUID(v)
-    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike)}"
+    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
     raise TypeError(msg)
 
 
@@ -93,31 +89,27 @@ def _to_uuid_pyarrow(v: UuidLike) -> pa.UuidScalar:
             return scalar(v.to_bytes(16), type=uuid())
         case str():
             return _to_uuid_pyarrow(UUID(v))
-    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike)}"
+    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
     raise TypeError(msg)
 
 
 @dataclass(frozen=True)
 class UuidDtype(ExtensionDtype):
-    """Pandas :class:`~pandas.api.extensions.ExtensionDtype` for UUIDs."""
+    """Pandas extension dtype for UUIDs."""
 
     # Custom
 
-    storage: UuidStorageKind = field(default_factory=default_storage_kind)
+    storage: UuidStorage = field(default_factory=default_storage_kind)
     """Storage kind, either `"numpy"` or `"pyarrow"`."""
 
     # ExtensionDtype essential API (3 class attrs and methods)
 
     name: ClassVar[str] = "uuid"
-    """The canonical name of the dtype."""
-
     type: ClassVar[builtins.type[UUID]] = UUID
-    """The Python type associated with the dtype."""
 
     @classmethod
     @override
     def construct_array_type(cls) -> type[UuidExtensionArray]:
-        """Return the array type associated with this dtype."""
         return UuidExtensionArray
 
     # ExtensionDtype overrides
@@ -142,16 +134,19 @@ class UuidDtype(ExtensionDtype):
     # IO
 
     def __from_arrow__(self, array: pa.Array | pa.ChunkedArray) -> UuidExtensionArray:
-        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`."""
+        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
+
+        See :ref:`pyarrow-integration` for an example.
+        """
         return UuidExtensionArray(array)
 
 
 class UuidExtensionArray(ExtensionArray):
-    """Pandas :class:`~pandas.api.extensions.ExtensionArray` for UUIDs."""
+    """Pandas extension array for UUIDs."""
 
     # Implementation details and convenience
 
-    _data: UuidStorage
+    _data: _UuidStorageArray
 
     def __init__(
         self,
@@ -167,7 +162,7 @@ class UuidExtensionArray(ExtensionArray):
         if isinstance(values, np.ndarray):
             if dtype is not None and dtype.storage != "numpy":
                 raise NotImplementedError
-            self._data = values.astype(UUID_NP_STORAGE_DTYPE, copy=copy)
+            self._data = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
         elif isinstance(values, pa.Array):
             if dtype is not None and dtype.storage != "pyarrow":
                 raise NotImplementedError
@@ -192,7 +187,7 @@ class UuidExtensionArray(ExtensionArray):
         else:
             self._data = np.array(
                 [_to_uuid_numpy(x).bytes for x in values],
-                dtype=UUID_NP_STORAGE_DTYPE,
+                dtype=_UUID_NP_STORAGE_DTYPE,
             )
 
         if getattr(self._data, "ndim", 1) != 1:
@@ -208,7 +203,6 @@ class UuidExtensionArray(ExtensionArray):
     @property
     @override
     def dtype(self) -> UuidDtype:
-        """Return the dtype with info about this array’s storage type."""
         match self._data:
             case pa.Array():
                 return UuidDtype(storage="pyarrow")
@@ -241,7 +235,6 @@ class UuidExtensionArray(ExtensionArray):
     def __getitem__(self, item: SequenceIndexer) -> Self: ...
     @override
     def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:
-        """Get the item(s) at position(s) `item`."""
         if isinstance(item, int | np.integer):
             match self._data[item]:
                 case pa.UuidScalar() as elem:
@@ -264,24 +257,20 @@ class UuidExtensionArray(ExtensionArray):
 
     @override
     def __len__(self) -> int:
-        """Return the length of the array."""
         return len(self._data)
 
     @unpack_zerodim_and_defer("__eq__")
     @override
     def __eq__(self, other: object) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Check element-wise equality with `other`."""
         return self._cmp("eq", other)
 
     @property
     @override
     def nbytes(self) -> int:
-        """Return the number of bytes needed to store this object in memory."""
         return self._data.nbytes
 
     @override
     def isna(self) -> NDArray[np.bool_]:
-        """Return a mask indicating which elements are missing."""
         return pd.isna(self._data)
 
     @override
@@ -292,7 +281,6 @@ class UuidExtensionArray(ExtensionArray):
         allow_fill: bool = False,
         fill_value: UUID | NAType | None = None,
     ) -> Self:
-        """See :meth:`~pandas.api.extensions.ExtensionArray.take`."""
         if allow_fill and fill_value is None:
             fill_value = self.dtype.na_value
 
@@ -301,7 +289,6 @@ class UuidExtensionArray(ExtensionArray):
 
     @override
     def copy(self) -> Self:
-        """Return a copy of the array."""
         return self._simple_new(
             self._data.copy() if isinstance(self._data, np.ndarray) else self._data
         )
@@ -321,7 +308,7 @@ class UuidExtensionArray(ExtensionArray):
     # Helpers
 
     @classmethod
-    def _simple_new(cls, values: UuidStorage) -> Self:
+    def _simple_new(cls, values: _UuidStorageArray) -> Self:
         result = UuidExtensionArray.__new__(cls)
         result._data = values  # noqa: SLF001
         return result
@@ -354,7 +341,8 @@ class UuidExtensionArray(ExtensionArray):
     ) -> pa.Array | pa.ChunkedArray:
         """Convert the underlying array values to a pyarrow Array.
 
-        See :ref:`pyarrow:arrow_array_protocol`.
+        See :ref:`pyarrow-integration` for an example
+        and :ref:`pyarrow:arrow_array_protocol` for details.
         """
         import pyarrow as pa
 

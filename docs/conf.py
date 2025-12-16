@@ -45,20 +45,18 @@ html_context = {
 # Add any Sphinx extension module names here, as strings.
 # They can be extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
-    "myst_nb",
     "sphinx_copybutton",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
-    "sphinx_autodoc_typehints",
     "sphinx_tabs.tabs",
     "sphinxext.opengraph",
     *[p.stem for p in (HERE / "extensions").glob("*.py")],
 ]
 
-autosummary_generate = True
-autodoc_member_order = "groupwise"
+autosummary_generate = False
+autodoc_member_order = "bysource"
 autodoc_default_options = {
     "inherited-members": False,
     "show-inheritance": True,
@@ -69,28 +67,9 @@ napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = False
 napoleon_use_rtype = True  # having a separate entry generally helps readability
 napoleon_use_param = True
-myst_heading_anchors = 6  # create anchors for h1-h6
-myst_enable_extensions = [
-    "amsmath",
-    "colon_fence",
-    "deflist",
-    "dollarmath",
-    "html_image",
-    "html_admonition",
-]
-myst_url_schemes = ("http", "https", "mailto")
 nb_output_stderr = "remove"
 nb_execution_mode = "off"
 nb_merge_streams = True
-typehints_defaults = "braces"
-
-suppress_warnings = ["mystnb.unknown_mime_type"]
-
-source_suffix = {
-    ".rst": "restructuredtext",
-    ".ipynb": "myst-nb",
-    ".myst": "myst-nb",
-}
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -104,6 +83,11 @@ intersphinx_mapping = {
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
+
+# Fix up undocumented types using the `resolve_from_map` extension
+type_map = {
+    ("py", "class", "NAType"): ("attr", "pandas.NA"),
+}
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -124,7 +108,3 @@ html_theme_options = {
 }
 
 pygments_style = "default"
-
-nitpick_ignore = [
-    #     ("py:class", "igraph.Graph"),  # noqa: ERA001
-]

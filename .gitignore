@@ -1,6 +1,5 @@
 __pycache__/
 
-/docs/pandas_uuid.*.rst
 /docs/_build/
 /dist/
 /.coverage

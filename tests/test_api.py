@@ -12,7 +12,7 @@ import pytest
 from pandas_uuid import UuidDtype, UuidExtensionArray
 
 if TYPE_CHECKING:
-    from pandas_uuid import UuidLike, UuidStorageKind
+    from pandas_uuid import UuidLike, UuidStorage
 
 skipif_no_pyarrow = pytest.mark.skipif(
     not find_spec("pyarrow"), reason="pyarrow is not installed"
@@ -22,7 +22,7 @@ skipif_no_pyarrow = pytest.mark.skipif(
 @pytest.fixture(
     scope="session", params=["numpy", pytest.param("pyarrow", marks=skipif_no_pyarrow)]
 )
-def storage(request: pytest.FixtureRequest) -> UuidStorageKind:
+def storage(request: pytest.FixtureRequest) -> UuidStorage:
     return request.param
 
 
@@ -44,11 +44,11 @@ else:
         pytest.param("00010203-0405-0607-0809-0a0b0c0d0e0f", id="str"),
     ],
 )
-def test_construct(storage: UuidStorageKind, value: UuidLike) -> None:
+def test_construct(storage: UuidStorage, value: UuidLike) -> None:
     UuidExtensionArray([value], dtype=UuidDtype(storage))
 
 
-def test_isna(request: pytest.FixtureRequest, storage: UuidStorageKind) -> None:
+def test_isna(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
     if storage == "numpy":
         request.applymarker(pytest.mark.xfail(raises=TypeError))
     arr = UuidExtensionArray([uuid4(), uuid4(), None], dtype=UuidDtype(storage))
