@@ -341,8 +341,8 @@ class UuidExtensionArray(ExtensionArray):
     ) -> pa.Array | pa.ChunkedArray:
         """Convert the underlying array values to a pyarrow Array.
 
-        See :ref:`pyarrow:arrow_array_protocol` and
-        :ref:`pyarrow-integration` for an example.
+        See :ref:`pyarrow-integration` for an example
+        and :ref:`pyarrow:arrow_array_protocol` for details.
         """
         import pyarrow as pa
 
