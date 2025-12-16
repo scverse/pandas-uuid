@@ -34,28 +34,23 @@ if TYPE_CHECKING:
     from pandas.core.arrays import BooleanArray
 
 
-__all__ = [
-    "UUID_NP_STORAGE_DTYPE",
-    "UuidDtype",
-    "UuidExtensionArray",
-    "UuidLike",
-    "UuidStorage",
-    "UuidStorageKind",
-]
+__all__ = ["UuidDtype", "UuidExtensionArray", "UuidLike", "UuidStorage"]
 
 
 # TODO: remove noqa when myst-parser supports sphinx 9
 # https://github.com/executablebooks/MyST-Parser/pull/1076
-UuidStorageKind: TypeAlias = 'Literal["numpy", "pyarrow"]'  # noqa: UP040
-UuidStorage: TypeAlias = "NDArray[np.void] | pa.UuidArray"  # noqa: UP040
+UuidStorage: TypeAlias = 'Literal["numpy", "pyarrow"]'  # noqa: UP040
 UuidLike: TypeAlias = "UUID | pa.UuidScalar | bytes | int | str"  # noqa: UP040
 
+_UuidStorageArray: TypeAlias = "NDArray[np.void] | pa.UuidArray"  # noqa: UP040
+
+
 # 16 void bytes: 128 bit, every pattern valid, no funky behavior like 0 stripping.
-UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
+_UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
 
 
 @cache
-def default_storage_kind() -> UuidStorageKind:
+def default_storage_kind() -> UuidStorage:
     if find_spec("pyarrow"):
         return "pyarrow"
     return "numpy"
@@ -103,7 +98,7 @@ class UuidDtype(ExtensionDtype):
 
     # Custom
 
-    storage: UuidStorageKind = field(default_factory=default_storage_kind)
+    storage: UuidStorage = field(default_factory=default_storage_kind)
     """Storage kind, either `"numpy"` or `"pyarrow"`."""
 
     # ExtensionDtype essential API (3 class attrs and methods)
@@ -151,7 +146,7 @@ class UuidExtensionArray(ExtensionArray):
 
     # Implementation details and convenience
 
-    _data: UuidStorage
+    _data: _UuidStorageArray
 
     def __init__(
         self,
@@ -167,7 +162,7 @@ class UuidExtensionArray(ExtensionArray):
         if isinstance(values, np.ndarray):
             if dtype is not None and dtype.storage != "numpy":
                 raise NotImplementedError
-            self._data = values.astype(UUID_NP_STORAGE_DTYPE, copy=copy)
+            self._data = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
         elif isinstance(values, pa.Array):
             if dtype is not None and dtype.storage != "pyarrow":
                 raise NotImplementedError
@@ -192,7 +187,7 @@ class UuidExtensionArray(ExtensionArray):
         else:
             self._data = np.array(
                 [_to_uuid_numpy(x).bytes for x in values],
-                dtype=UUID_NP_STORAGE_DTYPE,
+                dtype=_UUID_NP_STORAGE_DTYPE,
             )
 
         if getattr(self._data, "ndim", 1) != 1:
@@ -321,7 +316,7 @@ class UuidExtensionArray(ExtensionArray):
     # Helpers
 
     @classmethod
-    def _simple_new(cls, values: UuidStorage) -> Self:
+    def _simple_new(cls, values: _UuidStorageArray) -> Self:
         result = UuidExtensionArray.__new__(cls)
         result._data = values  # noqa: SLF001
         return result

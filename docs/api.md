@@ -8,4 +8,7 @@
 
     UuidDtype
     UuidExtensionArray
+
+    UuidStorage
+    UuidLike
 ```
