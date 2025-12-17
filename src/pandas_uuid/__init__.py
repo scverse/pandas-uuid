@@ -230,7 +230,7 @@ class UuidExtensionArray(ExtensionArray):
         if not isinstance(dtype, UuidDtype):
             msg = f"{cls.__name__!r} only supports `UuidDtype` dtype"
             raise TypeError(msg)
-        return cls(scalars, copy=copy)
+        return cls(scalars, copy=copy, dtype=dtype)
 
     @overload
     def __getitem__(self, item: ScalarIndexer) -> UUID: ...
@@ -242,7 +242,7 @@ class UuidExtensionArray(ExtensionArray):
             match self._data[item]:
                 case pa.UuidScalar() as elem:
                     return elem.as_py()
-                case np.bytes_() as elem:
+                case np.void() as elem:
                     return UUID(bytes=elem.tobytes())
                 case elem:
                     msg = f"Unknown type for Uuid: {type(elem)}"
