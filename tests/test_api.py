@@ -126,3 +126,9 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
     ):
         with subtests.test(i=i):
             assert list(batch) == expected.tolist()
+
+
+def test_concat_empty(*, has_pyarrow: bool) -> None:
+    concat = UuidExtensionArray._concat_same_type([])  # noqa: SLF001
+    assert concat.dtype == UuidDtype("pyarrow" if has_pyarrow else "numpy")
+    assert concat.tolist() == []
