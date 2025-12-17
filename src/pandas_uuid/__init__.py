@@ -165,7 +165,11 @@ class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
             msg = f"{type(self).__name__!r} only supports `UuidDtype` dtype"
             raise TypeError(msg)
 
-        if isinstance(values, np.ndarray):
+        # TODO: implement conversion between storage kinds
+        # https://github.com/scverse/pandas-uuid/issues/12
+
+        # we treat object arrays as sequences (we can’t efficiently convert)
+        if isinstance(values, np.ndarray) and values.dtype.kind != "O":
             if dtype is not None and dtype.storage != "numpy":
                 raise NotImplementedError
             self._data = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
@@ -175,11 +179,13 @@ class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
             from pyarrow import uuid
 
             self._data = values.cast(uuid())
+
+        # TODO: make construction from elements more efficient
+        #       (both numpy and pyarrow)
+        # https://github.com/scverse/pandas-uuid/issues/2
         elif (dtype is None and find_spec("pyarrow")) or (
             dtype is not None and dtype.storage == "pyarrow"
         ):
-            # TODO: make this and the next branch more efficient
-            # https://github.com/scverse/pandas-uuid/issues/2
             from pyarrow import array, binary, uuid
 
             # cast because of https://github.com/apache/arrow/issues/48470
