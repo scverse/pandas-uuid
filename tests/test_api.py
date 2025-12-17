@@ -58,7 +58,7 @@ def test_construct(storage: UuidStorage, value: UuidLike) -> None:
     UuidExtensionArray([value], dtype=UuidDtype(storage))
 
 
-def test_construct_error(storage: UuidStorage) -> None:
+def test_construct_elem_error(storage: UuidStorage) -> None:
     with pytest.raises(TypeError):
         UuidExtensionArray([()], dtype=UuidDtype(storage))  # pyright: ignore[reportArgumentType]
 
