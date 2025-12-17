@@ -109,7 +109,8 @@ lint.per-file-ignores."tests/*" = [
   "D103",    # Missing docstring in public function
   "D105",    # Missing docstring in magic method
   "INP001",  # __init__.py
-  "PLR0917", # Test may have many arguments
+  "PLR0913", # Test may have many arguments
+  "PLR0917", # Positional or keyword means nothing for tests
   "RUF018",  # assert with := is fine
   "S101",    # Use of assert
 ]

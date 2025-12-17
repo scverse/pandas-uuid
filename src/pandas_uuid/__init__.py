@@ -295,8 +295,20 @@ class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
         allow_fill: bool = False,
         fill_value: UUID | NAType | None = None,
     ) -> Self:
+        if self.dtype.storage == "pyarrow":
+            # TODO: implement take for pyarrow
+            # https://github.com/scverse/pandas-uuid/issues/11
+            raise NotImplementedError
+
         if allow_fill and fill_value is None:
             fill_value = self.dtype.na_value
+
+        if (
+            self.dtype.storage == "numpy"
+            and allow_fill
+            and not isinstance(fill_value, UUID)
+        ):  # pandas’ take will create an object array which is not supported
+            raise NotImplementedError
 
         result = take(self._data, indexer, allow_fill=allow_fill, fill_value=fill_value)
         return self._simple_new(result)

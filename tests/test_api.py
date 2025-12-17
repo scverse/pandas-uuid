@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from typing import Any, Literal
     from uuid import UUID
 
-    from pandas._typing import ScalarIndexer, SequenceIndexer
+    from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
     from pandas_uuid import UuidStorage
 
@@ -34,9 +34,9 @@ def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) 
     ("values", "index", "expected"),
     [
         pytest.param([u0 := uuid4()], 0, u0, id="only-py"),
-        pytest.param([u0 := uuid4()], np.int64(0), u0, id="only-np"),
+        pytest.param([u1 := uuid4()], np.int64(0), u1, id="only-np"),
         pytest.param([None], 0, None, id="only-na"),
-        pytest.param([u0, u1 := uuid4()], 1, u1, id="second"),
+        pytest.param([u0, u1], 1, u1, id="second"),
         pytest.param([u0, u1], slice(None), [u0, u1], id="all-slice"),
         pytest.param([None, u1], slice(None), [None, u1], id="all-slice-na"),
         pytest.param([u0, u1], slice(None, None, -1), [u1, u0], id="inv-slice"),
@@ -58,6 +58,49 @@ def test_getitem(
             assert arr[index].tolist() == expected
         case _:
             assert arr[index] == expected
+
+
+@pytest.mark.parametrize(
+    ("values", "index_list", "expected"),
+    [
+        pytest.param([u0 := uuid4()], [0], [u0], id="only"),
+        pytest.param([None], [0], [None], id="only-na"),
+        pytest.param([u0, u1], [1], [u1], id="second"),
+        pytest.param([u0, u1], [0, 1], [u0, u1], id="all-list"),
+        pytest.param([u0, u1], [1, 0], [u1, u0], id="all-list-reorder"),
+    ],
+)
+@pytest.mark.parametrize(
+    "index_type",
+    [
+        pytest.param(np.array, id="array-numpy"),
+        pytest.param(pd.array, id="array-pandas"),
+        pd.Index,
+        pd.Series,
+    ],
+)
+def test_take(
+    request: pytest.FixtureRequest,
+    storage: UuidStorage,
+    xfail_if_numpy_and_na: Callable[..., None],
+    values: list[UUID | None],
+    index_list: list[int | np.integer],
+    index_type: Callable[..., TakeIndexer],
+    expected: UUID | list[UUID],
+) -> None:
+    if storage == "pyarrow":
+        request.applymarker(pytest.mark.xfail(raises=NotImplementedError))
+    xfail_if_numpy_and_na(values)
+    index = index_type(index_list)
+    arr = pd.array(values, dtype=UuidDtype(storage))
+    assert arr.take(index).tolist() == expected
+
+
+@pytest.mark.xfail(raises=NotImplementedError)
+def test_take_fill(storage: UuidStorage) -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
+    result = arr.take([1, -1], allow_fill=True).tolist()
+    assert result == [arr[1], None]
 
 
 @pytest.mark.parametrize(
