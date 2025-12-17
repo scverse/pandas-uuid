@@ -310,7 +310,13 @@ class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
     @override
     @classmethod
     def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # pyright: ignore[reportGeneralTypeIssues]
-        return cls._simple_new(np.concatenate([x._data for x in to_concat]))  # noqa: SLF001
+        if isinstance(to_concat[0]._data, np.ndarray):  # noqa: SLF001
+            values = np.concatenate([x._data for x in to_concat])  # noqa: SLF001
+        else:
+            from pyarrow import concat_arrays
+
+            values = concat_arrays([x._data for x in to_concat])  # noqa: SLF001
+        return cls._simple_new(values)
 
     # Other overrides
 

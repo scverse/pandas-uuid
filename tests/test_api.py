@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from functools import partial
+from itertools import batched
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -100,3 +101,28 @@ def test_eq(
 def test_shape(storage: UuidStorage) -> None:
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     assert arr.shape == (2,)
+
+
+@pytest.mark.parametrize("length", [1, 2, 5, 13])
+def test_nbytes(storage: UuidStorage, length: int) -> None:
+    arr = pd.array([uuid4() for _ in range(length)], dtype=UuidDtype(storage))
+    assert arr.nbytes == 16 * length
+
+
+def test_copy(storage: UuidStorage) -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
+    assert arr.copy().tolist() == arr.tolist()
+
+
+def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+    batch_len = 4
+    arrays = [
+        pd.array([uuid4() for _ in range(batch_len)], dtype=UuidDtype(storage))
+        for _ in range(4)
+    ]
+    concat = UuidExtensionArray._concat_same_type(arrays)  # noqa: SLF001
+    for i, (expected, batch) in enumerate(
+        zip(arrays, batched(concat, batch_len), strict=True)
+    ):
+        with subtests.test(i=i):
+            assert list(batch) == expected.tolist()
