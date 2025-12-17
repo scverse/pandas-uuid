@@ -11,8 +11,10 @@ __all__ = [
     "ChunkedArray",
     "DataType",
     "ExtensionArray",
+    "Scalar",
     "UuidArray",
     "UuidScalar",
+    "UuidType",
 ]
 
 
@@ -22,8 +24,10 @@ if TYPE_CHECKING or find_spec("pyarrow"):
         ChunkedArray,
         DataType,
         ExtensionArray,
+        Scalar,
         UuidArray,
         UuidScalar,
+        UuidType,
     )
 
     HAS_PYARROW = True
@@ -32,7 +36,9 @@ else:  # pragma: no cover
     ChunkedArray = type("ChunkedArray", (), dict(__module__="pyarrow"))
     DataType = type("DataType", (), dict(__module__="pyarrow"))
     ExtensionArray = type("ExtensionArray", (), dict(__module__="pyarrow"))
+    Scalar = type("Scalar", (), dict(__module__="pyarrow"))
     UuidArray = type("UuidArray", (), dict(__module__="pyarrow"))
     UuidScalar = type("UuidScalar", (), dict(__module__="pyarrow"))
+    UuidType = type("UuidType", (), dict(__module__="pyarrow"))
 
     HAS_PYARROW = False

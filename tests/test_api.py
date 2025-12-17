@@ -5,15 +5,14 @@ from __future__ import annotations
 
 from functools import partial
 from itertools import batched
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from pandas_uuid import UuidDtype, UuidExtensionArray
-from pandas_uuid._pyarrow import HAS_PYARROW
+from pandas_uuid import UuidDtype
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
 
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
-    from pandas_uuid import UuidStorage
+    from pandas_uuid import ArrowUuidArray, UuidArray, UuidStorage
 
 
 def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) -> None:
@@ -127,13 +126,16 @@ def test_eq(
     # https://github.com/scverse/pandas-uuid/issues/10
     storage: UuidStorage,
     xfail_if_numpy_and_na: Callable[..., None],
-    left: list[UUID | None] | UuidExtensionArray,
-    right: list[UUID | None] | UuidExtensionArray,
+    left: list[UUID | None] | UuidArray | ArrowUuidArray,
+    right: list[UUID | None] | UuidArray | ArrowUuidArray,
     is_arr: Literal["left", "right", "both"],
     expected: list[bool | None],
 ) -> None:
     xfail_if_numpy_and_na(left, right)
-    to_arr = partial(UuidExtensionArray, dtype=UuidDtype(storage))
+    to_arr = cast(
+        "Callable[..., UuidArray | ArrowUuidArray]",
+        partial(pd.array, dtype=UuidDtype(storage)),
+    )
     if is_arr != "left":
         right = to_arr(right)
     if is_arr != "right":
@@ -159,12 +161,12 @@ def test_copy(storage: UuidStorage) -> None:
 
 
 def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+    dtype = UuidDtype(storage)
     batch_len = 4
     arrays = [
-        pd.array([uuid4() for _ in range(batch_len)], dtype=UuidDtype(storage))
-        for _ in range(4)
+        pd.array([uuid4() for _ in range(batch_len)], dtype=dtype) for _ in range(4)
     ]
-    concat = UuidExtensionArray._concat_same_type(arrays)  # noqa: SLF001
+    concat = dtype.construct_array_type()._concat_same_type(arrays)  # noqa: SLF001
     for i, (expected, batch) in enumerate(
         zip(arrays, batched(concat, batch_len), strict=True)
     ):
@@ -172,7 +174,7 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
             assert list(batch) == expected.tolist()
 
 
-def test_concat_empty() -> None:
-    concat = UuidExtensionArray._concat_same_type([])  # noqa: SLF001
-    assert concat.dtype == UuidDtype("pyarrow" if HAS_PYARROW else "numpy")
+def test_concat_empty(storage: UuidStorage) -> None:
+    cls = UuidDtype(storage).construct_array_type()
+    concat = cls._concat_same_type([])
     assert concat.tolist() == []

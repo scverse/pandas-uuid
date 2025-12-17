@@ -5,7 +5,13 @@
 
 ..  currentmodule:: pandas_uuid
 
-..  autoclass:: UuidExtensionArray
+..  autoclass:: BaseUuidArray
+
+..  autoclass:: UuidArray
+    :members: __arrow_array__
+    :special-members: __init__
+
+..  autoclass:: ArrowUuidArray
     :members: __arrow_array__
     :special-members: __init__
 

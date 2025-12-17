@@ -13,7 +13,9 @@ API
 ---
 
 ..  autosummary::
-    pandas_uuid.UuidExtensionArray
+    pandas_uuid.BaseUuidArray
+    pandas_uuid.UuidArray
+    pandas_uuid.ArrowUuidArray
     pandas_uuid.UuidDtype
     pandas_uuid.UuidStorage
     pandas_uuid.UuidLike

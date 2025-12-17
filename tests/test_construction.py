@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MPL-2.0
-"""Test constructing a UuidExtensionArray in various ways."""
+"""Test constructing an {Arrow,}Uuidrray in various ways."""
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -10,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pandas_uuid import UuidDtype, UuidExtensionArray
+from pandas_uuid import ArrowUuidArray, UuidArray, UuidDtype
 from pandas_uuid._pyarrow import HAS_PYARROW
 
 if TYPE_CHECKING:
@@ -25,9 +26,19 @@ skipif_no_pyarrow = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="session", params=[pd.array, UuidExtensionArray])
-def api(request: pytest.FixtureRequest) -> Callable[..., UuidExtensionArray]:
-    return request.param
+@pytest.fixture(scope="session", params=["pd.array", "type"])
+def api(
+    request: pytest.FixtureRequest, storage: UuidStorage
+) -> Callable[..., UuidArray | ArrowUuidArray]:
+    match request.param, storage:
+        case "pd.array", _:
+            return partial(pd.array, dtype=UuidDtype(storage))  # pyright: ignore[reportReturnType]
+        case "type", "numpy":
+            return UuidArray
+        case "type", "pyarrow":
+            return ArrowUuidArray
+        case _:
+            pytest.fail(f"unknown (api, storage): {request.param} {storage}")
 
 
 def test_default_storage() -> None:
@@ -41,7 +52,7 @@ def test_default_storage() -> None:
 )
 def test_construct_array(
     request: pytest.FixtureRequest,
-    api: Callable[..., UuidExtensionArray],
+    api: Callable[..., UuidArray | ArrowUuidArray],
     arg: UuidStorage,
     storage: UuidStorage,
 ) -> None:
@@ -57,7 +68,7 @@ def test_construct_array(
 
             store = pa.array([v.bytes for v in values], type=uuid())
 
-    arr = api(store, dtype=UuidDtype(storage))
+    arr = api(store)
     assert arr.dtype == UuidDtype(storage)
     assert arr.tolist() == values
 
@@ -70,9 +81,13 @@ def test_construct_array(
         ),
     ],
 )
-def test_construct_array_error(arr: Any, exc_cls: type[Exception]) -> None:  # noqa: ANN401
+def test_construct_array_error(
+    api: Callable[..., UuidArray | ArrowUuidArray],
+    arr: Any,  # noqa: ANN401
+    exc_cls: type[Exception],
+) -> None:
     with pytest.raises(exc_cls):
-        UuidExtensionArray(arr)
+        api(arr)
 
 
 try:
@@ -94,17 +109,20 @@ else:
     ],
 )
 def test_construct_elem(
-    api: Callable[..., UuidExtensionArray], storage: UuidStorage, value: UuidLike
+    api: Callable[..., UuidArray | ArrowUuidArray],
+    storage: UuidStorage,
+    value: UuidLike,
 ) -> None:
-    arr = api([value], dtype=UuidDtype(storage))
+    arr = api([value])
     assert arr.dtype == UuidDtype(storage)
 
 
-def test_construct_elem_error(storage: UuidStorage) -> None:
+def test_construct_elem_error(api: Callable[..., UuidArray | ArrowUuidArray]) -> None:
     with pytest.raises(TypeError):
-        UuidExtensionArray([()], dtype=UuidDtype(storage))  # pyright: ignore[reportArgumentType]
+        api([()])  # pyright: ignore[reportArgumentType]
 
 
-def test_construct_dtype_error() -> None:
-    with pytest.raises(TypeError, match=r"support.*UuidDtype"):
-        UuidExtensionArray([], dtype=object)  # pyright: ignore[reportArgumentType]
+@pytest.mark.parametrize("api", [UuidArray, ArrowUuidArray])
+def test_construct_dtype_error(api: type[UuidArray | ArrowUuidArray]) -> None:
+    with pytest.raises(ValueError, match=r"support.*UuidDtype"):
+        api([], dtype=object)  # pyright: ignore[reportArgumentType]
