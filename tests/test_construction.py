@@ -56,8 +56,6 @@ def test_construct_array(
             from pyarrow import uuid
 
             store = pa.array([v.bytes for v in values], type=uuid())
-        case _:
-            pytest.fail(f"Unknown storage: {storage}")
 
     arr = api(store, dtype=UuidDtype(storage))
     assert arr.dtype == UuidDtype(storage)
