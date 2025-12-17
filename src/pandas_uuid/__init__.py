@@ -144,7 +144,7 @@ class UuidDtype(ExtensionDtype):
         return UuidExtensionArray(array)
 
 
-class UuidExtensionArray(ExtensionArray):
+class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
     """Pandas extension array for UUIDs."""
 
     # Implementation details and convenience
@@ -162,6 +162,10 @@ class UuidExtensionArray(ExtensionArray):
 
         Constructing from a :type:`UuidStorage` is fast.
         """
+        if not isinstance(dtype, UuidDtype | None):
+            msg = f"{type(self).__name__!r} only supports `UuidDtype` dtype"
+            raise TypeError(msg)
+
         if isinstance(values, np.ndarray):
             if dtype is not None and dtype.storage != "numpy":
                 raise NotImplementedError
@@ -197,10 +201,6 @@ class UuidExtensionArray(ExtensionArray):
             msg = "Array only supports 1-d arrays"
             raise ValueError(msg)
 
-    @override
-    def __hash__(self) -> int:
-        return hash(self._data)
-
     # ExtensionArray essential API (11 class attrs and methods)
 
     @property
@@ -224,12 +224,6 @@ class UuidExtensionArray(ExtensionArray):
         dtype: UuidDtype | None = None,
         copy: bool = False,
     ) -> Self:
-        if dtype is None:
-            dtype = UuidDtype()
-
-        if not isinstance(dtype, UuidDtype):
-            msg = f"{cls.__name__!r} only supports `UuidDtype` dtype"
-            raise TypeError(msg)
         return cls(scalars, copy=copy, dtype=dtype)
 
     @overload
@@ -244,8 +238,8 @@ class UuidExtensionArray(ExtensionArray):
                     return elem.as_py()
                 case np.void() as elem:
                     return UUID(bytes=elem.tobytes())
-                case elem:
-                    msg = f"Unknown type for Uuid: {type(elem)}"
+                case elem:  # pragma: no cover
+                    msg = f"Unknown type in storage: {type(elem)}"
                     raise AssertionError(msg)
         item = check_array_indexer(self, item)
         if (
@@ -254,7 +248,28 @@ class UuidExtensionArray(ExtensionArray):
             and isinstance(self._data, pa.Array | pa.ChunkedArray)
         ):
             return self._simple_new(self._data.filter(item))
-        return self._simple_new(self._data[item])
+
+        match self._data, item:
+            case (np.ndarray(), _):
+                values = self._data[item]
+            case pa.Array(), slice() if (
+                item.step in {1, None}
+                and isinstance(item.start, int | None)
+                and isinstance(item.stop, int | None)
+            ):
+                start = item.start if item.start is not None else 0
+                length = item.stop - start if item.stop is not None else None
+                values = self._data.slice(start, length)
+            case pa.Array(), slice():
+                item = np.array(range(len(self._data))[item])
+                values = self._data.take(item)
+            case pa.Array(), np.ndarray():
+                values = self._data.take(item)
+            case _:
+                msg = f"Cannot index with {item!r}"
+                raise ValueError(msg)
+
+        return self._simple_new(values)
 
     # def __setitem__(self, index, value):
 
@@ -320,7 +335,7 @@ class UuidExtensionArray(ExtensionArray):
         if isinstance(other, UuidExtensionArray):
             other = other._data  # noqa: SLF001
         elif isinstance(other, Sequence):
-            other = np.asarray(other)
+            other = np.asarray(other, dtype=_UUID_NP_STORAGE_DTYPE)
             if other.ndim > 1:
                 msg = "can only perform ops with 1-d structures"
                 raise NotImplementedError(msg)
@@ -330,9 +345,6 @@ class UuidExtensionArray(ExtensionArray):
 
         method = getattr(self._data, f"__{op}__")
         result = method(other)
-
-        # TODO: deal with `result` being NotImplemented
-        # https://github.com/scverse/pandas-uuid/issues/1
 
         return cast("BooleanArray", pd.array(result, dtype="boolean"))
 
