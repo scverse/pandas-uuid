@@ -18,5 +18,5 @@
         "editor.defaultFormatter": "biomejs.biome",
     },
     "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": ["--color=yes"],
+    "python.testing.pytestArgs": ["--color=yes", "-vv"],
 }

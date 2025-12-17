@@ -13,8 +13,8 @@ API
 ---
 
 ..  autosummary::
-    pandas_uuid.UuidDtype
     pandas_uuid.UuidExtensionArray
+    pandas_uuid.UuidDtype
     pandas_uuid.UuidStorage
     pandas_uuid.UuidLike
 
@@ -44,10 +44,16 @@ to :class:`pyarrow.UuidArray` automatically …
   E8F04C2EED42488E9E96FE6C80D06BF6
 ]
 
-And back manually. There is no registry,
-so neither :class:`pyarrow.UuidArray` nor :mod:`pandas` knows,
-only our :class:`~pandas_uuid.UuidDtype`:
+And back manually.
+:class:`pyarrow.UuidType` does not know about this package,
+so we need to specificallye use our :class:`~pandas_uuid.UuidDtype`:
 
 >>> pd.Series(arr, dtype=UuidDtype())
+0    e8f04c2e-ed42-488e-9e96-fe6c80d06bf6
+dtype: uuid
+
+or (this would make more sense with a :class:`pyarrow.Table`):
+
+>>> arr.to_pandas(types_mapper={pa.uuid(): UuidDtype()}.get)
 0    e8f04c2e-ed42-488e-9e96-fe6c80d06bf6
 dtype: uuid

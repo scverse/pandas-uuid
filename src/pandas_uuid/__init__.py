@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from importlib.util import find_spec
@@ -22,7 +21,7 @@ from . import _pyarrow as pa
 
 if TYPE_CHECKING:
     import builtins
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
     from typing import Self
 
     import numpy.typing as npt
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
 
     from pandas._libs.missing import NAType
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
-    from pandas.core.arrays import BooleanArray
+    from pandas.arrays import BooleanArray
 
 
 __all__ = ["UuidDtype", "UuidExtensionArray", "UuidLike", "UuidStorage"]
@@ -51,7 +50,7 @@ _UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
 
 
 @cache
-def default_storage_kind() -> UuidStorage:
+def _default_storage_kind() -> UuidStorage:
     if find_spec("pyarrow"):
         return "pyarrow"
     return "numpy"
@@ -99,7 +98,7 @@ class UuidDtype(ExtensionDtype):
 
     # Custom
 
-    storage: UuidStorage = field(default_factory=default_storage_kind)
+    storage: UuidStorage = field(default_factory=_default_storage_kind)
     """Storage kind, either `"numpy"` or `"pyarrow"`."""
 
     # ExtensionDtype essential API (3 class attrs and methods)
@@ -134,14 +133,17 @@ class UuidDtype(ExtensionDtype):
     # IO
 
     def __from_arrow__(self, array: pa.Array | pa.ChunkedArray) -> UuidExtensionArray:
-        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
+        """PyArrow extension API for :meth:`pyarrow.Array.to_pandas`.
+
+        Incomplete because :meth:`pyarrow.UuidType.to_pandas_dtype`
+        does not refer to this (see :ref:`pyarrow:conversion-to-pandas`).
 
         See :ref:`pyarrow-integration` for an example.
         """
         return UuidExtensionArray(array)
 
 
-class UuidExtensionArray(ExtensionArray):
+class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
     """Pandas extension array for UUIDs."""
 
     # Implementation details and convenience
@@ -159,7 +161,15 @@ class UuidExtensionArray(ExtensionArray):
 
         Constructing from a :type:`UuidStorage` is fast.
         """
-        if isinstance(values, np.ndarray):
+        if not isinstance(dtype, UuidDtype | None):
+            msg = f"{type(self).__name__!r} only supports `UuidDtype` dtype"
+            raise TypeError(msg)
+
+        # TODO: implement conversion between storage kinds
+        # https://github.com/scverse/pandas-uuid/issues/12
+
+        # we treat object arrays as sequences (we can’t efficiently convert)
+        if isinstance(values, np.ndarray) and values.dtype.kind != "O":
             if dtype is not None and dtype.storage != "numpy":
                 raise NotImplementedError
             self._data = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
@@ -169,11 +179,13 @@ class UuidExtensionArray(ExtensionArray):
             from pyarrow import uuid
 
             self._data = values.cast(uuid())
+
+        # TODO: make construction from elements more efficient
+        #       (both numpy and pyarrow)
+        # https://github.com/scverse/pandas-uuid/issues/2
         elif (dtype is None and find_spec("pyarrow")) or (
             dtype is not None and dtype.storage == "pyarrow"
         ):
-            # TODO: make this and the next branch more efficient
-            # https://github.com/scverse/pandas-uuid/issues/2
             from pyarrow import array, binary, uuid
 
             # cast because of https://github.com/apache/arrow/issues/48470
@@ -193,10 +205,6 @@ class UuidExtensionArray(ExtensionArray):
         if getattr(self._data, "ndim", 1) != 1:
             msg = "Array only supports 1-d arrays"
             raise ValueError(msg)
-
-    @override
-    def __hash__(self) -> int:
-        return hash(self._data)
 
     # ExtensionArray essential API (11 class attrs and methods)
 
@@ -221,13 +229,7 @@ class UuidExtensionArray(ExtensionArray):
         dtype: UuidDtype | None = None,
         copy: bool = False,
     ) -> Self:
-        if dtype is None:
-            dtype = UuidDtype()
-
-        if not isinstance(dtype, UuidDtype):
-            msg = f"{cls.__name__!r} only supports `UuidDtype` dtype"
-            raise TypeError(msg)
-        return cls(scalars, copy=copy)
+        return cls(scalars, copy=copy, dtype=dtype)
 
     @overload
     def __getitem__(self, item: ScalarIndexer) -> UUID: ...
@@ -239,10 +241,10 @@ class UuidExtensionArray(ExtensionArray):
             match self._data[item]:
                 case pa.UuidScalar() as elem:
                     return elem.as_py()
-                case np.bytes_() as elem:
+                case np.void() as elem:
                     return UUID(bytes=elem.tobytes())
-                case elem:
-                    msg = f"Unknown type for Uuid: {type(elem)}"
+                case elem:  # pragma: no cover
+                    msg = f"Unknown type in storage: {type(elem)}"
                     raise AssertionError(msg)
         item = check_array_indexer(self, item)
         if (
@@ -251,7 +253,25 @@ class UuidExtensionArray(ExtensionArray):
             and isinstance(self._data, pa.Array | pa.ChunkedArray)
         ):
             return self._simple_new(self._data.filter(item))
-        return self._simple_new(self._data[item])
+
+        match self._data, item:
+            case (np.ndarray(), _):
+                values = self._data[item]
+            case pa.Array(), slice() if (
+                item.step in {1, None}
+                and isinstance(item.start, int | None)
+                and isinstance(item.stop, int | None)
+            ):
+                start = item.start if item.start is not None else 0
+                length = item.stop - start if item.stop is not None else None
+                values = self._data.slice(start, length)
+            case pa.Array(), slice():
+                item = np.array(range(len(self._data))[item])
+                values = self._data.take(item)
+            case pa.Array(), np.ndarray():
+                values = self._data.take(item)
+
+        return self._simple_new(values)
 
     # def __setitem__(self, index, value):
 
@@ -281,8 +301,20 @@ class UuidExtensionArray(ExtensionArray):
         allow_fill: bool = False,
         fill_value: UUID | NAType | None = None,
     ) -> Self:
+        if self.dtype.storage == "pyarrow":
+            # TODO: implement take for pyarrow
+            # https://github.com/scverse/pandas-uuid/issues/11
+            raise NotImplementedError
+
         if allow_fill and fill_value is None:
             fill_value = self.dtype.na_value
+
+        if (
+            self.dtype.storage == "numpy"
+            and allow_fill
+            and not isinstance(fill_value, UUID)
+        ):  # pandas’ take will create an object array which is not supported
+            raise NotImplementedError
 
         result = take(self._data, indexer, allow_fill=allow_fill, fill_value=fill_value)
         return self._simple_new(result)
@@ -296,7 +328,15 @@ class UuidExtensionArray(ExtensionArray):
     @override
     @classmethod
     def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # pyright: ignore[reportGeneralTypeIssues]
-        return cls._simple_new(np.concatenate([x._data for x in to_concat]))  # noqa: SLF001
+        if len(to_concat) == 0:
+            return cls([])
+        if isinstance(to_concat[0]._data, np.ndarray):  # noqa: SLF001
+            values = np.concatenate([x._data for x in to_concat])  # noqa: SLF001
+        else:
+            from pyarrow import concat_arrays
+
+            values = concat_arrays([x._data for x in to_concat])  # noqa: SLF001
+        return cls._simple_new(values)
 
     # Other overrides
 
@@ -313,23 +353,28 @@ class UuidExtensionArray(ExtensionArray):
         result._data = values  # noqa: SLF001
         return result
 
-    def _cmp(self, op: str, other: object) -> BooleanArray:
-        if isinstance(other, UuidExtensionArray):
-            other = other._data  # noqa: SLF001
-        elif isinstance(other, Sequence):
-            other = np.asarray(other)
-            if other.ndim > 1:
-                msg = "can only perform ops with 1-d structures"
-                raise NotImplementedError(msg)
-            if len(self) != len(other):
-                msg = "Lengths must match to compare"
-                raise ValueError(msg)
+    def _cmp(
+        self, op: str, other: Sequence[UuidLike] | UuidExtensionArray
+    ) -> BooleanArray:
+        if not isinstance(other, UuidExtensionArray):
+            other = cast("UuidExtensionArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
 
-        method = getattr(self._data, f"__{op}__")
-        result = method(other)
+        match self._data, other._data:  # noqa: SLF001
+            case pa.Array(), pa.Array():
+                if op != "eq":  # pragma: no cover
+                    raise NotImplementedError
 
-        # TODO: deal with `result` being NotImplemented
-        # https://github.com/scverse/pandas-uuid/issues/1
+                from pyarrow import binary, compute
+
+                result = compute.equal(
+                    self._data.view(binary(16)),
+                    other._data.view(binary(16)),  # noqa: SLF001
+                )
+            case np.ndarray(), np.ndarray():
+                method = getattr(self._data, f"__{op}__")
+                result = method(other._data.view(np.void(16)))  # noqa: SLF001
+            case _:  # pragma: no cover
+                raise NotImplementedError
 
         return cast("BooleanArray", pd.array(result, dtype="boolean"))
 
@@ -339,7 +384,7 @@ class UuidExtensionArray(ExtensionArray):
         self,
         type: pa.DataType | None = None,  # noqa: A002
     ) -> pa.Array | pa.ChunkedArray:
-        """Convert the underlying array values to a pyarrow Array.
+        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
 
         See :ref:`pyarrow-integration` for an example
         and :ref:`pyarrow:arrow_array_protocol` for details.

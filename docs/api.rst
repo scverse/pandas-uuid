@@ -12,6 +12,6 @@
 ..  autoclass:: UuidDtype
     :members: storage, na_value, __from_arrow__
 
-..  autotype:: UuidLike
-
 ..  autotype:: UuidStorage
+
+..  autotype:: UuidLike

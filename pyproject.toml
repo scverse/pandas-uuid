@@ -58,9 +58,16 @@ extras = ["pyarrow"]
 deps = ["pre"]
 [tool.hatch.envs.hatch-test]
 dependency-groups = ["typing"]
-extra-dependencies = ["ipykernel"]
+extra-dependencies = ["ipykernel", "pytest-cov"] # for VS Code’s coverage
 [tool.hatch.envs.hatch-test.overrides]
-matrix.extras.features = [{ if = ["pyarrow"], value = "pyarrow" }]
+matrix.extras.features = [{ value = "pyarrow", if = ["pyarrow"] }]
+# weirdly, uv pulls in pyarrow unless that constraint is specified,
+# but seems to have no problem to just leave it out. why?
+matrix.extras.env-vars = [
+  { key = "UV_CONSTRAINT", value = ".github/no-pyarrow.txt", if = [
+    "none",
+  ] },
+]
 matrix.deps.env-vars = [
   { key = "UV_PRERELEASE", value = "allow", if = [
     "pre",
@@ -98,12 +105,14 @@ lint.per-file-ignores."src/pandas_uuid/__main__.py" = [
   "T201", # print is fine
 ]
 lint.per-file-ignores."tests/*" = [
-  "D102",   # Missing docstring in public method
-  "D103",   # Missing docstring in public function
-  "D105",   # Missing docstring in magic method
-  "INP001", # __init__.py
-  "RUF018", # assert with := is fine
-  "S101",   # Use of assert
+  "D102",    # Missing docstring in public method
+  "D103",    # Missing docstring in public function
+  "D105",    # Missing docstring in magic method
+  "INP001",  # __init__.py
+  "PLR0913", # Test may have many arguments
+  "PLR0917", # Positional or keyword means nothing for tests
+  "RUF018",  # assert with := is fine
+  "S101",    # Use of assert
 ]
 lint.allowed-confusables = ["×", "’"]
 lint.flake8-copyright.notice-rgx = "SPDX-License-Identifier: MPL-2\\.0"
@@ -123,10 +132,8 @@ filterwarnings = ["error"]
 source = ["pandas_uuid"]
 patch = ["subprocess"]
 omit = ["**/test_*.py"]
-
 [tool.coverage.paths]
 package = ["src/pandas_uuid", "*/pandas-uuid/src/pandas_uuid"]
 tests = ["tests", "*/pandas_uuid/tests"]
-
 [tool.coverage.report]
 exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
