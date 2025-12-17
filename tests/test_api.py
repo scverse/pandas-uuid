@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -10,9 +11,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pandas_uuid import UuidDtype
+from pandas_uuid import UuidDtype, UuidExtensionArray
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import Any, Literal
     from uuid import UUID
 
     from pandas._typing import ScalarIndexer, SequenceIndexer
@@ -20,9 +23,8 @@ if TYPE_CHECKING:
     from pandas_uuid import UuidStorage
 
 
-def test_isna(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
-    if storage == "numpy":
-        request.applymarker(pytest.mark.xfail(raises=TypeError))
+def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) -> None:
+    xfail_if_numpy_and_na()
     arr = pd.array([uuid4(), uuid4(), None], dtype=UuidDtype(storage))
     assert arr.isna().tolist() == [False, False, True]
 
@@ -42,17 +44,59 @@ def test_isna(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
     ],
 )
 def test_getitem(
-    request: pytest.FixtureRequest,
     storage: UuidStorage,
+    xfail_if_numpy_and_na: Callable[..., None],
     values: list[UUID | None],
     index: ScalarIndexer | SequenceIndexer,
     expected: UUID | list[UUID],
 ) -> None:
-    if None in values and storage == "numpy":
-        request.applymarker(pytest.mark.xfail(raises=TypeError))
+    xfail_if_numpy_and_na(values)
     arr = pd.array(values, dtype=UuidDtype(storage))
     match expected:
         case list():
             assert arr[index].tolist() == expected
         case _:
             assert arr[index] == expected
+
+
+@pytest.mark.parametrize(
+    "index", [pytest.param(999, id="oob"), pytest.param("", id="type")]
+)
+def test_getitem_error(index: Any) -> None:  # noqa: ANN401
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype("numpy"))
+    with pytest.raises(IndexError):
+        arr[index]
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "expected"),
+    [
+        pytest.param([u0 := uuid4(), u1 := uuid4()], [u0, u1], [True] * 2, id="same"),
+        pytest.param([u0, u1], [u0, u0], [True, False], id="different"),
+        pytest.param([u0, None], [u0, u1], [True, None], id="na"),
+    ],
+)
+@pytest.mark.parametrize("is_arr", ["left", "right", "none"])
+def test_eq(
+    # TODO: test unequal storage
+    # https://github.com/scverse/pandas-uuid/issues/10
+    storage: UuidStorage,
+    xfail_if_numpy_and_na: Callable[..., None],
+    left: list[UUID | None] | UuidExtensionArray,
+    right: list[UUID | None] | UuidExtensionArray,
+    is_arr: Literal["left", "right", "both"],
+    expected: list[bool | None],
+) -> None:
+    xfail_if_numpy_and_na(left, right)
+    to_arr = partial(UuidExtensionArray, dtype=UuidDtype(storage))
+    if is_arr != "left":
+        right = to_arr(right)
+    if is_arr != "right":
+        left = to_arr(left)
+    arr_exp = pd.array(expected, dtype="boolean")
+    pd.testing.assert_extension_array_equal(left == right, arr_exp)  # pyright: ignore[reportArgumentType]
+
+
+def test_shape(storage: UuidStorage) -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
+    assert arr.shape == (2,)

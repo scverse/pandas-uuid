@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from importlib.util import find_spec
@@ -22,7 +21,7 @@ from . import _pyarrow as pa
 
 if TYPE_CHECKING:
     import builtins
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
     from typing import Self
 
     import numpy.typing as npt
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
 
     from pandas._libs.missing import NAType
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
-    from pandas.core.arrays import BooleanArray
+    from pandas.arrays import BooleanArray
 
 
 __all__ = ["UuidDtype", "UuidExtensionArray", "UuidLike", "UuidStorage"]
@@ -265,9 +264,6 @@ class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
                 values = self._data.take(item)
             case pa.Array(), np.ndarray():
                 values = self._data.take(item)
-            case _:
-                msg = f"Cannot index with {item!r}"
-                raise ValueError(msg)
 
         return self._simple_new(values)
 
@@ -331,20 +327,28 @@ class UuidExtensionArray(ExtensionArray):  # noqa: PLW1641
         result._data = values  # noqa: SLF001
         return result
 
-    def _cmp(self, op: str, other: object) -> BooleanArray:
-        if isinstance(other, UuidExtensionArray):
-            other = other._data  # noqa: SLF001
-        elif isinstance(other, Sequence):
-            other = np.asarray(other, dtype=_UUID_NP_STORAGE_DTYPE)
-            if other.ndim > 1:
-                msg = "can only perform ops with 1-d structures"
-                raise NotImplementedError(msg)
-            if len(self) != len(other):
-                msg = "Lengths must match to compare"
-                raise ValueError(msg)
+    def _cmp(
+        self, op: str, other: Sequence[UuidLike] | UuidExtensionArray
+    ) -> BooleanArray:
+        if not isinstance(other, UuidExtensionArray):
+            other = cast("UuidExtensionArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
 
-        method = getattr(self._data, f"__{op}__")
-        result = method(other)
+        match self._data, other._data:  # noqa: SLF001
+            case pa.Array(), pa.Array():
+                if op != "eq":  # pragma: no cover
+                    raise NotImplementedError
+
+                from pyarrow import binary, compute
+
+                result = compute.equal(
+                    self._data.view(binary(16)),
+                    other._data.view(binary(16)),  # noqa: SLF001
+                )
+            case np.ndarray(), np.ndarray():
+                method = getattr(self._data, f"__{op}__")
+                result = method(other._data.view(np.void(16)))  # noqa: SLF001
+            case _:  # pragma: no cover
+                raise NotImplementedError
 
         return cast("BooleanArray", pd.array(result, dtype="boolean"))
 
