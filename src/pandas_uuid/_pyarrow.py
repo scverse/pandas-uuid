@@ -25,6 +25,8 @@ if TYPE_CHECKING or find_spec("pyarrow"):
         UuidArray,
         UuidScalar,
     )
+
+    HAS_PYARROW = True
 else:  # pragma: no cover
     Array = type("Array", (), dict(__module__="pyarrow"))
     ChunkedArray = type("ChunkedArray", (), dict(__module__="pyarrow"))
@@ -32,3 +34,5 @@ else:  # pragma: no cover
     ExtensionArray = type("ExtensionArray", (), dict(__module__="pyarrow"))
     UuidArray = type("UuidArray", (), dict(__module__="pyarrow"))
     UuidScalar = type("UuidScalar", (), dict(__module__="pyarrow"))
+
+    HAS_PYARROW = False

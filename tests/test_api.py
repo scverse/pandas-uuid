@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 from pandas_uuid import UuidDtype, UuidExtensionArray
+from pandas_uuid._pyarrow import HAS_PYARROW
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -171,7 +172,7 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
             assert list(batch) == expected.tolist()
 
 
-def test_concat_empty(*, has_pyarrow: bool) -> None:
+def test_concat_empty() -> None:
     concat = UuidExtensionArray._concat_same_type([])  # noqa: SLF001
-    assert concat.dtype == UuidDtype("pyarrow" if has_pyarrow else "numpy")
+    assert concat.dtype == UuidDtype("pyarrow" if HAS_PYARROW else "numpy")
     assert concat.tolist() == []

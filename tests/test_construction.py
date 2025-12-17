@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from pandas_uuid import UuidDtype, UuidExtensionArray
+from pandas_uuid._pyarrow import HAS_PYARROW
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -19,18 +20,25 @@ if TYPE_CHECKING:
     from pandas_uuid import UuidLike, UuidStorage
 
 
+skipif_no_pyarrow = pytest.mark.skipif(
+    not HAS_PYARROW, reason="pyarrow is not installed"
+)
+
+
 @pytest.fixture(scope="session", params=[pd.array, UuidExtensionArray])
 def api(request: pytest.FixtureRequest) -> Callable[..., UuidExtensionArray]:
     return request.param
 
 
-def test_default_storage(*, has_pyarrow: bool) -> None:
+def test_default_storage() -> None:
     dtype = UuidDtype()
-    assert dtype.storage == ("pyarrow" if has_pyarrow else "numpy")
+    assert dtype.storage == ("pyarrow" if HAS_PYARROW else "numpy")
     assert dtype.na_value is pd.NA
 
 
-@pytest.mark.parametrize("arg", ["numpy", "pyarrow"])
+@pytest.mark.parametrize(
+    "arg", ["numpy", pytest.param("pyarrow", marks=skipif_no_pyarrow)]
+)
 def test_construct_array(
     request: pytest.FixtureRequest,
     api: Callable[..., UuidExtensionArray],
@@ -84,11 +92,7 @@ else:
         pytest.param(uuid4().bytes, id="bytes"),
         pytest.param(5, id="int"),
         pytest.param(str(uuid4()), id="str"),
-        pytest.param(
-            pa_uuid,
-            marks=pytest.mark.skipif(pa_uuid is None, reason="pyarrow not installed"),
-            id="pyarrow",
-        ),
+        pytest.param(pa_uuid, marks=skipif_no_pyarrow, id="pyarrow"),
     ],
 )
 def test_construct_elem(
