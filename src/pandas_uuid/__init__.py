@@ -513,25 +513,3 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
             other._pa_array.cast(pa.binary(16)),  # noqa: SLF001
         )
         return cast("BooleanArray", pd.array(result, dtype="boolean"))  # pyright: ignore[reportArgumentType]
-
-    # IO
-
-    @overload
-    def __arrow_array__(self, type: None = None) -> pa.Array[pa.UuidScalar]: ...
-    @overload
-    def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
-    def __arrow_array__(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self,
-        type: _DT | None = None,  # noqa: A002
-    ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
-        """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
-
-        See :ref:`pyarrow-integration` for an example
-        and :ref:`pyarrow:arrow_array_protocol` for details.
-        """
-        import pyarrow as pa
-
-        if type is None:
-            type = pa.uuid()  # pyright: ignore[reportAssignmentType] # noqa: A001
-
-        return self._pa_array.cast(type)  # pyright: ignore[reportReturnType]
