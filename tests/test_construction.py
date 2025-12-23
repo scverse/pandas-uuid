@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from functools import partial
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -16,7 +17,8 @@ from pandas_uuid._pyarrow import HAS_PYARROW
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
+
+    from pandas._typing import Dtype as PdDtype
 
     from pandas_uuid import UuidLike, UuidStorage
 
@@ -74,25 +76,54 @@ def test_construct_array(
 
 
 @pytest.mark.parametrize(
-    ("arr", "exc_cls"),
+    ("storage", "mk_arr", "dtype", "exc_cls"),
     [
         pytest.param(
-            np.array([[uuid4().bytes] * 2] * 2, dtype=np.void(16)), ValueError, id="2d"
+            "numpy",
+            lambda: np.array([[uuid4().bytes] * 2] * 2, dtype=np.void(16)),
+            None,
+            ValueError,
+            id="numpy-2d",
+        ),
+        pytest.param(
+            "numpy",
+            lambda: np.array([datetime.now()]),  # noqa: DTZ005
+            None,
+            TypeError,
+            id="numpy-dtype",
+        ),
+        pytest.param(
+            "pyarrow",
+            lambda pa: pa.array([datetime.now()], type=pa.timestamp("s")),  # noqa: DTZ005
+            None,
+            NotImplementedError,
+            id="pyarrow-dtype",
+        ),
+        pytest.param(
+            "numpy",
+            lambda: np.array([], dtype="V16"),
+            UuidDtype("pyarrow"),
+            ValueError,
+            id="numpy-dtype-arg",
         ),
     ],
 )
 def test_construct_array_error(
-    api: Callable[..., UuidArray | ArrowUuidArray],
     storage: UuidStorage,
-    arr: Any,  # noqa: ANN401
-    exc_cls: type[Exception],
+    mk_arr: Callable[..., np.ndarray | pa.Array],
+    dtype: PdDtype | None,
+    exc_cls: type[Exception] | tuple[type[Exception], ...],
 ) -> None:
-    with pytest.raises(exc_cls, match=r"1-d"):  # noqa: PT012
-        if storage == "pyarrow":
-            import pyarrow as pa
+    if storage == "pyarrow":
+        if not HAS_PYARROW:
+            pytest.skip("pyarrow is not installed")
+        import pyarrow as pa
 
-            arr = pa.array(arr, type=pa.uuid())
-        api(arr)
+        mk_arr = partial(mk_arr, pa)
+
+    api = dict(numpy=UuidArray, pyarrow=ArrowUuidArray)[storage]
+    with pytest.raises(exc_cls):
+        api(mk_arr(), dtype=dtype)
 
 
 def test_simple_new_error() -> None:

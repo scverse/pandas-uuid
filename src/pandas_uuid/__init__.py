@@ -53,7 +53,7 @@ from a sequence.
 
 if TYPE_CHECKING or sys.version_info >= (3, 13):
     _DT = TypeVar("_DT", bound="pa.DataType", default=pa.UuidType)
-else:
+else:  # pragma: no cover
     _DT = TypeVar("_DT", bound="pa.DataType")
 
 # 16 void bytes: 128 bit, every pattern valid, no funky behavior like 0 stripping.
@@ -204,8 +204,6 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
         # we treat object arrays as sequences (we can’t efficiently convert)
         if isinstance(values, np.ndarray) and values.dtype.kind != "O":
-            if dtype is not None and dtype.storage != "numpy":
-                raise NotImplementedError
             values = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
         else:
             # TODO: make construction from elements more efficient
@@ -365,9 +363,6 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             raise NotImplementedError
 
         if isinstance(values, pa.Array | pa.ChunkedArray):
-            if dtype is not None and dtype.storage != "pyarrow":
-                raise NotImplementedError
-
             self._pa_array = (
                 pa.chunked_array([values.cast(pa.uuid())])
                 if isinstance(values, pa.Array)
