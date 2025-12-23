@@ -252,7 +252,8 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         item = check_array_indexer(self, item)
         return self._simple_new(self._ndarray[item])
 
-    # def __setitem__(self, index, value):
+    # TODO: def __setitem__(self, index, value)
+    # https://github.com/scverse/pandas-uuid/issues/15
 
     # Some methods are implemented by NumpyExtensionArray:
     # __len__, __eq__, nbytes, take
@@ -438,7 +439,8 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
 
         return self._simple_new(values)
 
-    # def __setitem__(self, index, value):
+    # TODO: def __setitem__(self, index, value)
+    # https://github.com/scverse/pandas-uuid/issues/15
 
     # Some APIs are defined in ArrowExtensionArray/OpsMixin:
     # __len__, __eq__, nbytes, isna, take, copy
