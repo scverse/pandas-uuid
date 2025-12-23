@@ -262,10 +262,6 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         return np.zeros(len(self), dtype=bool)
 
     @override
-    def copy(self, order: Literal["C", "F", "A", "K"] = "C") -> Self:
-        return self._simple_new(self._ndarray.copy(order))
-
-    @override
     @classmethod
     def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # pyright: ignore[reportIncompatibleMethodOverride]
         if len(to_concat) == 0:

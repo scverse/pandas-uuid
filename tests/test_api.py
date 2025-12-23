@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pandas_uuid import UuidDtype
+from pandas_uuid import UuidArray, UuidDtype
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
-    from pandas_uuid import ArrowUuidArray, UuidArray, UuidStorage
+    from pandas_uuid import ArrowUuidArray, UuidStorage
 
 
 def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) -> None:
@@ -160,11 +160,20 @@ def test_nbytes(storage: UuidStorage, length: int) -> None:
     assert arr.nbytes == 16 * length
 
 
-def test_copy(storage: UuidStorage) -> None:
-    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
+def test_copy(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+    data = [uuid4(), uuid4()]
+    arr = pd.array(data, dtype=UuidDtype(storage))
     copy = arr.copy()
-    assert isinstance(copy, type(arr))
-    assert copy.tolist() == arr.tolist()
+
+    with subtests.test("copies"):
+        assert isinstance(copy, type(arr))
+        assert copy.tolist() == data
+
+    if isinstance(copy, UuidArray):
+        with subtests.test("original array is not modified"):
+            copy._ndarray[0] = uuid4().bytes  # noqa: SLF001
+            assert copy.tolist() != data
+            assert arr.tolist() == data
 
 
 def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
