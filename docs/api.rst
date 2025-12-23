@@ -8,10 +8,8 @@
 ..  autoclass:: BaseUuidArray
 
 ..  autoclass:: UuidArray
-    :special-members: __init__
 
 ..  autoclass:: ArrowUuidArray
-    :special-members: __init__
 
 ..  autoclass:: UuidDtype
     :members: storage, na_value

@@ -172,7 +172,7 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
 
 
 class UuidArray(BaseUuidArray, NumpyExtensionArray):
-    """Extension array for string data in a :class:`numpy.ndarray`."""
+    """Extension array for storing uuid data in a :class:`numpy.ndarray`."""
 
     # Implementation details and convenience
 
@@ -309,10 +309,10 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     # IO
 
     @overload
-    def __arrow_array__(self, type: None = None) -> pa.Array[pa.UuidScalar]: ...
+    def __arrow_array__(self, type: pa.UuidType | None = None) -> pa.UuidArray: ...
     @overload
     def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
-    def __arrow_array__(
+    def __arrow_array__(  # pyright: ignore[reportInconsistentOverload]
         self,
         type: _DT | None = None,  # noqa: A002
     ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
@@ -330,15 +330,15 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
 
 class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
-    """Extension array for uuid data in a :class:`pyarrow.ChunkedArray`."""
+    """Extension array for storing uuid data in a :class:`pyarrow.ChunkedArray`."""
 
-    _pa_array: pa.ChunkedArray[pa.Scalar[pa.UuidType]]
+    _pa_array: pa.ChunkedArray[pa.UuidScalar]
 
     def __init__(
         self,
         values: Iterable[UuidLike | NAType | None]
-        | pa.Array[pa.Scalar[pa.UuidType]]
-        | pa.ChunkedArray[pa.Scalar[pa.UuidType]],
+        | pa.UuidArray
+        | pa.ChunkedArray[pa.UuidScalar],
         *,
         dtype: UuidDtype | None = None,
     ) -> None:
@@ -367,7 +367,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
                 pa.chunked_array([values.cast(pa.uuid())])
                 if isinstance(values, pa.Array)
                 else values.cast(pa.uuid())
-            )
+            )  # pyright: ignore[reportAttributeAccessIssue]
         else:
             # TODO: make construction from elements more efficient
             #       (both numpy and pyarrow)
@@ -380,7 +380,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
                 ],
                 type=pa.uuid(),
             )
-            self._pa_array = pa.chunked_array([chunk])
+            self._pa_array = pa.chunked_array([chunk])  # pyright: ignore[reportAttributeAccessIssue]
 
     @cached_property
     @override
