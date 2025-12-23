@@ -5,15 +5,14 @@ from __future__ import annotations
 
 from functools import partial
 from itertools import batched
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from pandas_uuid import UuidDtype, UuidExtensionArray
-from pandas_uuid._pyarrow import HAS_PYARROW
+from pandas_uuid import UuidArray, UuidDtype
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
 
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
-    from pandas_uuid import UuidStorage
+    from pandas_uuid import ArrowUuidArray, UuidStorage
 
 
 def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) -> None:
@@ -31,15 +30,20 @@ def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) 
     assert arr.isna().tolist() == [False, False, True]
 
 
+def test_isna_numpy() -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype("numpy"))
+    assert arr.isna().tolist() == [False, False]
+
+
 @pytest.mark.parametrize(
     ("values", "index", "expected"),
     [
         pytest.param([u0 := uuid4()], 0, u0, id="only-py"),
         pytest.param([u1 := uuid4()], np.int64(0), u1, id="only-np"),
-        pytest.param([None], 0, None, id="only-na"),
+        pytest.param([pd.NA], 0, pd.NA, id="only-na"),
         pytest.param([u0, u1], 1, u1, id="second"),
         pytest.param([u0, u1], slice(None), [u0, u1], id="all-slice"),
-        pytest.param([None, u1], slice(None), [None, u1], id="all-slice-na"),
+        pytest.param([pd.NA, u1], slice(None), [pd.NA, u1], id="all-slice-na"),
         pytest.param([u0, u1], slice(None, None, -1), [u1, u0], id="inv-slice"),
         pytest.param([u0, u1], [0, 1], [u0, u1], id="all-list"),
         pytest.param([u0, u1], [1, 0], [u1, u0], id="all-list-reorder"),
@@ -57,6 +61,8 @@ def test_getitem(
     match expected:
         case list():
             assert arr[index].tolist() == expected
+        case _ if expected is pd.NA:
+            assert pd.isna(arr[index])
         case _:
             assert arr[index] == expected
 
@@ -65,7 +71,7 @@ def test_getitem(
     ("values", "index_list", "expected"),
     [
         pytest.param([u0 := uuid4()], [0], [u0], id="only"),
-        pytest.param([None], [0], [None], id="only-na"),
+        pytest.param([None], [0], [pd.NA], id="only-na"),
         pytest.param([u0, u1], [1], [u1], id="second"),
         pytest.param([u0, u1], [0, 1], [u0, u1], id="all-list"),
         pytest.param([u0, u1], [1, 0], [u1, u0], id="all-list-reorder"),
@@ -81,7 +87,6 @@ def test_getitem(
     ],
 )
 def test_take(
-    request: pytest.FixtureRequest,
     storage: UuidStorage,
     xfail_if_numpy_and_na: Callable[..., None],
     values: list[UUID | None],
@@ -89,19 +94,18 @@ def test_take(
     index_type: Callable[..., TakeIndexer],
     expected: UUID | list[UUID],
 ) -> None:
-    if storage == "pyarrow":
-        request.applymarker(pytest.mark.xfail(raises=NotImplementedError))
     xfail_if_numpy_and_na(values)
     index = index_type(index_list)
     arr = pd.array(values, dtype=UuidDtype(storage))
     assert arr.take(index).tolist() == expected
 
 
-@pytest.mark.xfail(raises=NotImplementedError)
-def test_take_fill(storage: UuidStorage) -> None:
+def test_take_fill(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
+    if storage == "numpy":
+        request.applymarker(pytest.mark.xfail(raises=ValueError))
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     result = arr.take([1, -1], allow_fill=True).tolist()
-    assert result == [arr[1], None]
+    assert result == [arr[1], pd.NA]
 
 
 @pytest.mark.parametrize(
@@ -118,7 +122,7 @@ def test_getitem_error(index: Any) -> None:  # noqa: ANN401
     [
         pytest.param([u0 := uuid4(), u1 := uuid4()], [u0, u1], [True] * 2, id="same"),
         pytest.param([u0, u1], [u0, u0], [True, False], id="different"),
-        pytest.param([u0, None], [u0, u1], [True, None], id="na"),
+        pytest.param([u0, pd.NA], [u0, u1], [True, pd.NA], id="na"),
     ],
 )
 @pytest.mark.parametrize("is_arr", ["left", "right", "none"])
@@ -127,19 +131,22 @@ def test_eq(
     # https://github.com/scverse/pandas-uuid/issues/10
     storage: UuidStorage,
     xfail_if_numpy_and_na: Callable[..., None],
-    left: list[UUID | None] | UuidExtensionArray,
-    right: list[UUID | None] | UuidExtensionArray,
+    left: list[UUID | None] | UuidArray | ArrowUuidArray,
+    right: list[UUID | None] | UuidArray | ArrowUuidArray,
     is_arr: Literal["left", "right", "both"],
     expected: list[bool | None],
 ) -> None:
     xfail_if_numpy_and_na(left, right)
-    to_arr = partial(UuidExtensionArray, dtype=UuidDtype(storage))
+    to_arr = cast(
+        "Callable[..., UuidArray | ArrowUuidArray]",
+        partial(pd.array, dtype=UuidDtype(storage)),
+    )
     if is_arr != "left":
         right = to_arr(right)
     if is_arr != "right":
         left = to_arr(left)
     arr_exp = pd.array(expected, dtype="boolean")
-    pd.testing.assert_extension_array_equal(left == right, arr_exp)  # pyright: ignore[reportArgumentType]
+    pd.testing.assert_extension_array_equal(left == right, arr_exp, check_dtype=False)  # pyright: ignore[reportArgumentType]
 
 
 def test_shape(storage: UuidStorage) -> None:
@@ -153,18 +160,29 @@ def test_nbytes(storage: UuidStorage, length: int) -> None:
     assert arr.nbytes == 16 * length
 
 
-def test_copy(storage: UuidStorage) -> None:
-    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
-    assert arr.copy().tolist() == arr.tolist()
+def test_copy(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+    data = [uuid4(), uuid4()]
+    arr = pd.array(data, dtype=UuidDtype(storage))
+    copy = arr.copy()
+
+    with subtests.test("copies"):
+        assert isinstance(copy, type(arr))
+        assert copy.tolist() == data
+
+    if isinstance(copy, UuidArray):
+        with subtests.test("original array is not modified"):
+            copy._ndarray[0] = uuid4().bytes  # noqa: SLF001
+            assert copy.tolist() != data
+            assert arr.tolist() == data
 
 
 def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+    dtype = UuidDtype(storage)
     batch_len = 4
     arrays = [
-        pd.array([uuid4() for _ in range(batch_len)], dtype=UuidDtype(storage))
-        for _ in range(4)
+        pd.array([uuid4() for _ in range(batch_len)], dtype=dtype) for _ in range(4)
     ]
-    concat = UuidExtensionArray._concat_same_type(arrays)  # noqa: SLF001
+    concat = dtype.construct_array_type()._concat_same_type(arrays)  # noqa: SLF001
     for i, (expected, batch) in enumerate(
         zip(arrays, batched(concat, batch_len), strict=True)
     ):
@@ -172,7 +190,7 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
             assert list(batch) == expected.tolist()
 
 
-def test_concat_empty() -> None:
-    concat = UuidExtensionArray._concat_same_type([])  # noqa: SLF001
-    assert concat.dtype == UuidDtype("pyarrow" if HAS_PYARROW else "numpy")
+def test_concat_empty(storage: UuidStorage) -> None:
+    cls = UuidDtype(storage).construct_array_type()
+    concat = cls._concat_same_type([])
     assert concat.tolist() == []

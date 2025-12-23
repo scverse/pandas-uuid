@@ -5,12 +5,14 @@
 
 ..  currentmodule:: pandas_uuid
 
-..  autoclass:: UuidExtensionArray
-    :members: __arrow_array__
-    :special-members: __init__
+..  autoclass:: BaseUuidArray
+
+..  autoclass:: UuidArray
+
+..  autoclass:: ArrowUuidArray
 
 ..  autoclass:: UuidDtype
-    :members: storage, na_value, __from_arrow__
+    :members: storage, na_value
 
 ..  autotype:: UuidStorage
 
