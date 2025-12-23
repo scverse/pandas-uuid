@@ -17,7 +17,6 @@ from pandas.api.extensions import ExtensionArray, ExtensionDtype
 from pandas.api.indexers import check_array_indexer
 from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
 from pandas.core.algorithms import take
-from pandas.core.ops.common import unpack_zerodim_and_defer
 
 from . import _pyarrow as pa
 
@@ -173,7 +172,7 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
         return (len(self),)
 
 
-class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
+class UuidArray(BaseUuidArray, NumpyExtensionArray):
     """Extension array for string data in a :class:`numpy.ndarray`."""
 
     # Implementation details and convenience
@@ -256,18 +255,12 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
 
     # def __setitem__(self, index, value):
 
-    @override
-    def __len__(self) -> int:
-        return len(self._ndarray)
-
-    @unpack_zerodim_and_defer("__eq__")
-    @override
-    def __eq__(self, other: object) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return self._cmp("eq", other)
+    # Some methods are implemented by NumpyExtensionArray:
+    # __len__, __eq__
 
     @cached_property
     @override
-    def nbytes(self) -> int:
+    def nbytes(self) -> int:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._ndarray.nbytes
 
     @override
@@ -324,11 +317,14 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
             raise ValueError(msg)
         return super()._simple_new(values, dtype=dtype)
 
-    def _cmp(self, op: str, other: Sequence[UuidLike] | UuidArray) -> BooleanArray:
+    @override
+    def _cmp_method(
+        self, other: Sequence[UuidLike] | UuidArray, op: FunctionType
+    ) -> BooleanArray:
         if not isinstance(other, UuidArray):
             other = cast("UuidArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
 
-        method = getattr(self._ndarray, f"__{op}__")
+        method = getattr(self._ndarray, f"__{op.__name__}__")
         result = method(other._ndarray.view(np.void(16)))  # noqa: SLF001
         return cast("BooleanArray", pd.array(result, dtype="boolean"))
 
