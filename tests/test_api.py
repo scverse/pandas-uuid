@@ -35,10 +35,10 @@ def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) 
     [
         pytest.param([u0 := uuid4()], 0, u0, id="only-py"),
         pytest.param([u1 := uuid4()], np.int64(0), u1, id="only-np"),
-        pytest.param([None], 0, None, id="only-na"),
+        pytest.param([pd.NA], 0, pd.NA, id="only-na"),
         pytest.param([u0, u1], 1, u1, id="second"),
         pytest.param([u0, u1], slice(None), [u0, u1], id="all-slice"),
-        pytest.param([None, u1], slice(None), [None, u1], id="all-slice-na"),
+        pytest.param([pd.NA, u1], slice(None), [pd.NA, u1], id="all-slice-na"),
         pytest.param([u0, u1], slice(None, None, -1), [u1, u0], id="inv-slice"),
         pytest.param([u0, u1], [0, 1], [u0, u1], id="all-list"),
         pytest.param([u0, u1], [1, 0], [u1, u0], id="all-list-reorder"),
@@ -56,6 +56,8 @@ def test_getitem(
     match expected:
         case list():
             assert arr[index].tolist() == expected
+        case _ if expected is pd.NA:
+            assert pd.isna(arr[index])
         case _:
             assert arr[index] == expected
 

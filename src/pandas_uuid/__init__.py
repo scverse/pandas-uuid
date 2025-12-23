@@ -6,7 +6,7 @@ from __future__ import annotations
 import abc
 import sys
 from dataclasses import dataclass, field
-from functools import cache
+from functools import cache, cached_property
 from importlib.util import find_spec
 from typing import TYPE_CHECKING, Literal, TypeVar, cast, get_args, overload, override
 from uuid import UUID
@@ -115,14 +115,14 @@ class UuidDtype(ExtensionDtype):
 
     # ExtensionDtype essential API (3 class attrs and methods)
 
-    @property
+    @cached_property
     @override
-    def name(self) -> Literal["uuid"]:
+    def name(self) -> Literal["uuid"]:  # pyright: ignore[reportIncompatibleMethodOverride]
         return "uuid"
 
-    @property
+    @cached_property
     @override
-    def type(self) -> type[UUID]:
+    def type(self) -> type[UUID]:  # pyright: ignore[reportIncompatibleMethodOverride]
         return UUID
 
     @override
@@ -131,9 +131,9 @@ class UuidDtype(ExtensionDtype):
 
     # ExtensionDtype overrides
 
-    @property
+    @cached_property
     @override
-    def kind(self) -> Literal["O", "V"]:
+    def kind(self) -> Literal["O", "V"]:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Return the dtype’s kind.
 
         Should be `"V"`, but `"O"` is used because of `pandas-dev/pandas#54810`_.
@@ -142,9 +142,9 @@ class UuidDtype(ExtensionDtype):
         """
         return "O"
 
-    @property
+    @cached_property
     @override
-    def na_value(self) -> NAType:
+    def na_value(self) -> NAType:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Returns :attr:`pandas.NA`, i.e. this dtype has missing value semantics."""
         return pd.NA
 
@@ -225,7 +225,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
 
     # ExtensionArray essential API (11 class attrs and methods)
 
-    @property
+    @cached_property
     @override
     def dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleMethodOverride]
         return UuidDtype(storage="numpy")
@@ -264,7 +264,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
     def __eq__(self, other: object) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._cmp("eq", other)
 
-    @property
+    @cached_property
     @override
     def nbytes(self) -> int:
         return self._ndarray.nbytes
@@ -358,7 +358,6 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
     """Extension array for uuid data in a :class:`pyarrow.ChunkedArray`."""
 
     _pa_array: pa.ChunkedArray[pa.Scalar[pa.UuidType]]
-    _dtype: UuidDtype
 
     def __init__(
         self,
@@ -378,8 +377,6 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
                 f"not {dtype}"
             )
             raise ValueError(msg)
-
-        self._dtype = UuidDtype(storage="pyarrow")  # pyright: ignore[reportIncompatibleVariableOverride]
 
         import pyarrow as pa
 
@@ -411,12 +408,17 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
             )
             self._pa_array = pa.chunked_array([chunk])
 
+    @cached_property
+    @override
+    def _dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleVariableOverride]
+        return UuidDtype(storage="pyarrow")
+
     # ExtensionArray essential API (11 class attrs and methods)
 
-    @property
+    @cached_property
     @override
     def dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return UuidDtype(storage="pyarrow")
+        return self._dtype
 
     @override
     @classmethod
@@ -431,14 +433,16 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
         return cls(scalars, dtype=dtype)
 
     @overload
-    def __getitem__(self, item: ScalarIndexer) -> UUID: ...
+    def __getitem__(self, item: ScalarIndexer) -> UUID | NAType: ...
     @overload
     def __getitem__(self, item: SequenceIndexer) -> Self: ...
     @override
-    def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:
+    def __getitem__(
+        self, item: ScalarIndexer | SequenceIndexer
+    ) -> Self | UUID | NAType:
         if isinstance(item, int | np.integer):
             elem = cast("pa.UuidScalar", self._pa_array[item])  # pyright: ignore[reportArgumentType, reportCallIssue]
-            return elem.as_py()
+            return elem.as_py() if elem.is_valid else self.dtype.na_value
 
         item = check_array_indexer(self, item)
         match item:
@@ -474,9 +478,9 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
     def __eq__(self, other: Sequence[UuidLike] | ArrowUuidArray) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._cmp("eq", other)
 
-    @property
+    @cached_property
     @override
-    def nbytes(self) -> int:
+    def nbytes(self) -> int:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._pa_array.nbytes
 
     @override
