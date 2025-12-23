@@ -95,6 +95,16 @@ def test_construct_array_error(
         api(arr)
 
 
+def test_simple_new_error() -> None:
+    with pytest.raises(ValueError, match=r"support.*UuidDtype"):
+        UuidArray._simple_new(np.ndarray([]), dtype=object)  # pyright: ignore[reportArgumentType]  # noqa: SLF001
+
+
+def test_from_backing_data_error() -> None:
+    with pytest.raises(ValueError, match=r"values.dtype.*V16"):
+        UuidArray([])._from_backing_data(np.ndarray([], dtype=object))  # pyright: ignore[reportArgumentType]  # noqa: SLF001
+
+
 try:
     import pyarrow as pa
 except ImportError:

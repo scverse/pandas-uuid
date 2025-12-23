@@ -289,8 +289,10 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     def _from_backing_data(self, values: NDArray[np.void]) -> Self:
         if values.dtype != _UUID_NP_STORAGE_DTYPE:
+            name = type(self).__name__
             msg = (
-                f"{type(self).__name__!r} only supports dtype={_UUID_NP_STORAGE_DTYPE}"
+                f"{name!r} only supports `values.dtype=='{_UUID_NP_STORAGE_DTYPE}'`, "
+                f"not {values.dtype}"
             )
             raise ValueError(msg)
         return super()._from_backing_data(values)
