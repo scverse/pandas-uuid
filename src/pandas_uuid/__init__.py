@@ -23,6 +23,7 @@ from . import _pyarrow as pa
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+    from types import FunctionType
     from typing import Self
 
     import numpy.typing as npt
@@ -354,7 +355,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
         return pa.array(self._ndarray, type=type)  # pyright: ignore[reportReturnType]
 
 
-class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
+class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
     """Extension array for uuid data in a :class:`pyarrow.ChunkedArray`."""
 
     _pa_array: pa.ChunkedArray[pa.Scalar[pa.UuidType]]
@@ -466,13 +467,8 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
 
     # def __setitem__(self, index, value):
 
-    # Some APIs are defined in ArrowExtensionArray:
-    # __len__, nbytes, isna, take, copy
-
-    @unpack_zerodim_and_defer("__eq__")
-    @override
-    def __eq__(self, other: Sequence[UuidLike] | ArrowUuidArray) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return self._cmp("eq", other)
+    # Some APIs are defined in ArrowExtensionArray/OpsMixin:
+    # __len__, __eq__, nbytes, isna, take, copy
 
     @override
     @classmethod
@@ -498,18 +494,17 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
         result._pa_array = values  # noqa: SLF001
         return result
 
-    def _cmp(self, op: str, other: Sequence[UuidLike] | ArrowUuidArray) -> BooleanArray:
-        if not isinstance(other, ArrowUuidArray):
-            other = cast("ArrowUuidArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
-
-        if op != "eq":  # pragma: no cover
-            raise NotImplementedError
-
+    def _cmp_method(  # pyright: ignore[reportIncompatibleMethodOverride]
+        self, other: Sequence[UuidLike] | ArrowUuidArray, op: FunctionType
+    ) -> BooleanArray:
         import pyarrow as pa
-        from pyarrow import compute
+        from pandas.core.arrays.arrow.array import ARROW_CMP_FUNCS
 
-        result = compute.equal(
+        if not isinstance(other, ArrowUuidArray):
+            other = ArrowUuidArray(other)
+
+        result = ARROW_CMP_FUNCS[op.__name__](
             self._pa_array.cast(pa.binary(16)),
-            other._pa_array.cast(pa.binary(16)),  # noqa: SLF001
+            other._pa_array.cast(pa.binary(16)),
         )
         return cast("BooleanArray", pd.array(result, dtype="boolean"))  # pyright: ignore[reportArgumentType]

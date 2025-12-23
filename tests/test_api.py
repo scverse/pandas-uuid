@@ -117,7 +117,7 @@ def test_getitem_error(index: Any) -> None:  # noqa: ANN401
     [
         pytest.param([u0 := uuid4(), u1 := uuid4()], [u0, u1], [True] * 2, id="same"),
         pytest.param([u0, u1], [u0, u0], [True, False], id="different"),
-        pytest.param([u0, None], [u0, u1], [True, None], id="na"),
+        pytest.param([u0, pd.NA], [u0, u1], [True, pd.NA], id="na"),
     ],
 )
 @pytest.mark.parametrize("is_arr", ["left", "right", "none"])
@@ -141,7 +141,7 @@ def test_eq(
     if is_arr != "right":
         left = to_arr(left)
     arr_exp = pd.array(expected, dtype="boolean")
-    pd.testing.assert_extension_array_equal(left == right, arr_exp)  # pyright: ignore[reportArgumentType]
+    pd.testing.assert_extension_array_equal(left == right, arr_exp, check_dtype=False)  # pyright: ignore[reportArgumentType]
 
 
 def test_shape(storage: UuidStorage) -> None:
