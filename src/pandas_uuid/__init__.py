@@ -415,10 +415,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
 
     # ExtensionArray essential API (11 class attrs and methods)
 
-    @cached_property
-    @override
-    def dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return self._dtype
+    dtype: UuidDtype  # pyright: ignore[reportIncompatibleMethodOverride]
 
     @override
     @classmethod
@@ -469,43 +466,13 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
 
     # def __setitem__(self, index, value):
 
-    @override
-    def __len__(self) -> int:
-        return len(self._pa_array)
+    # Some APIs are defined in ArrowExtensionArray:
+    # __len__, nbytes, isna, take, copy
 
     @unpack_zerodim_and_defer("__eq__")
     @override
     def __eq__(self, other: Sequence[UuidLike] | ArrowUuidArray) -> BooleanArray:  # pyright: ignore[reportIncompatibleMethodOverride]
         return self._cmp("eq", other)
-
-    @cached_property
-    @override
-    def nbytes(self) -> int:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return self._pa_array.nbytes
-
-    @override
-    def isna(self) -> NDArray[np.bool_]:
-        return self._pa_array.is_null().to_numpy()
-
-    @override
-    def take(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self,
-        indices: TakeIndexer,
-        *,
-        allow_fill: bool = False,
-        fill_value: UUID | NAType | None = None,
-    ) -> Self:
-        # TODO: implement take for pyarrow
-        # https://github.com/scverse/pandas-uuid/issues/11
-        raise NotImplementedError
-
-    @override
-    def copy(self) -> Self:
-        return self._simple_new(
-            self._pa_array.copy()
-            if isinstance(self._pa_array, np.ndarray)
-            else self._pa_array
-        )
 
     @override
     @classmethod

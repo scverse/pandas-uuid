@@ -66,7 +66,7 @@ def test_getitem(
     ("values", "index_list", "expected"),
     [
         pytest.param([u0 := uuid4()], [0], [u0], id="only"),
-        pytest.param([None], [0], [None], id="only-na"),
+        pytest.param([None], [0], [pd.NA], id="only-na"),
         pytest.param([u0, u1], [1], [u1], id="second"),
         pytest.param([u0, u1], [0, 1], [u0, u1], id="all-list"),
         pytest.param([u0, u1], [1, 0], [u1, u0], id="all-list-reorder"),
@@ -82,7 +82,6 @@ def test_getitem(
     ],
 )
 def test_take(
-    request: pytest.FixtureRequest,
     storage: UuidStorage,
     xfail_if_numpy_and_na: Callable[..., None],
     values: list[UUID | None],
@@ -90,19 +89,18 @@ def test_take(
     index_type: Callable[..., TakeIndexer],
     expected: UUID | list[UUID],
 ) -> None:
-    if storage == "pyarrow":
-        request.applymarker(pytest.mark.xfail(raises=NotImplementedError))
     xfail_if_numpy_and_na(values)
     index = index_type(index_list)
     arr = pd.array(values, dtype=UuidDtype(storage))
     assert arr.take(index).tolist() == expected
 
 
-@pytest.mark.xfail(raises=NotImplementedError)
-def test_take_fill(storage: UuidStorage) -> None:
+def test_take_fill(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
+    if storage == "numpy":
+        request.applymarker(pytest.mark.xfail(raises=NotImplementedError))
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     result = arr.take([1, -1], allow_fill=True).tolist()
-    assert result == [arr[1], None]
+    assert result == [arr[1], pd.NA]
 
 
 @pytest.mark.parametrize(
@@ -159,7 +157,9 @@ def test_nbytes(storage: UuidStorage, length: int) -> None:
 
 def test_copy(storage: UuidStorage) -> None:
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
-    assert arr.copy().tolist() == arr.tolist()
+    copy = arr.copy()
+    assert isinstance(copy, type(arr))
+    assert copy.tolist() == arr.tolist()
 
 
 def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
