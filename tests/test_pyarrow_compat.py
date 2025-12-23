@@ -51,7 +51,8 @@ def test_pyarrow_to_pandas(api: Literal["pyarrow", "pandas"]) -> None:
         case "pandas":
             pd_ser = pd.Series(pa_arr, dtype=UuidDtype())  # pyright: ignore[reportArgumentType, reportCallIssue]
         case "pyarrow":
-            pd_ser = pa_arr.to_pandas(types_mapper={pa.uuid(): UuidDtype()}.get)  # pyright: ignore[reportArgumentType]
+            mapper = {pa.uuid(): UuidDtype()}.get
+            pd_ser = pa_arr.to_pandas(types_mapper=mapper)  # pyright: ignore[reportArgumentType]
 
     expected = pd.array(data, dtype=UuidDtype("pyarrow"))
     pd.testing.assert_extension_array_equal(pd_ser.array, expected)

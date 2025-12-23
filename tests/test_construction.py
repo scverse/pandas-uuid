@@ -56,7 +56,7 @@ def test_construct_array(
     arg: UuidStorage,
     storage: UuidStorage,
 ) -> None:
-    if arg != storage:
+    if storage == "pyarrow" and arg == "numpy":
         request.applymarker(pytest.mark.xfail(raises=NotImplementedError))
 
     values = [uuid4(), uuid4()]
@@ -77,16 +77,21 @@ def test_construct_array(
     ("arr", "exc_cls"),
     [
         pytest.param(
-            np.array([[uuid4().bytes]], dtype=np.void(16)), ValueError, id="2d"
+            np.array([[uuid4().bytes] * 2] * 2, dtype=np.void(16)), ValueError, id="2d"
         ),
     ],
 )
 def test_construct_array_error(
     api: Callable[..., UuidArray | ArrowUuidArray],
+    storage: UuidStorage,
     arr: Any,  # noqa: ANN401
     exc_cls: type[Exception],
 ) -> None:
-    with pytest.raises(exc_cls):
+    with pytest.raises(exc_cls, match=r"1-d"):  # noqa: PT012
+        if storage == "pyarrow":
+            import pyarrow as pa
+
+            arr = pa.array(arr, type=pa.uuid())
         api(arr)
 
 

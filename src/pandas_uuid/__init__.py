@@ -158,7 +158,7 @@ class UuidDtype(ExtensionDtype):
 
         See :ref:`pyarrow-integration` for an example.
         """
-        return ArrowExtensionArray(array)
+        return ArrowUuidArray(array)
 
 
 class BaseUuidArray(ExtensionArray, abc.ABC):
@@ -217,8 +217,8 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):  # noqa: PLW1641
                 dtype=_UUID_NP_STORAGE_DTYPE,
             )
 
-        if getattr(self._ndarray, "ndim", 1) != 1:
-            msg = "Array only supports 1-d arrays"
+        if values.ndim != 1:
+            msg = "Array only supports 1-dimensional arrays"
             raise ValueError(msg)
 
         super().__init__(values)
@@ -385,6 +385,8 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # noqa: PLW1641
 
         # TODO: implement conversion between storage kinds
         # https://github.com/scverse/pandas-uuid/issues/12
+        if isinstance(values, np.ndarray) and values.dtype.kind != "O":
+            raise NotImplementedError
 
         if isinstance(values, pa.Array | pa.ChunkedArray):
             if dtype is not None and dtype.storage != "pyarrow":
