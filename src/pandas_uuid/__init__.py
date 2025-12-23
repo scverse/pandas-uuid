@@ -181,7 +181,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     def __init__(
         self,
-        values: Iterable[UuidLike | NAType | None],
+        values: Iterable[UuidLike],
         *,
         copy: bool = False,
         dtype: UuidDtype | None = None,
@@ -336,7 +336,9 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
 
     def __init__(
         self,
-        values: Iterable[UuidLike | NAType | None],
+        values: Iterable[UuidLike | NAType | None]
+        | pa.Array[pa.Scalar[pa.UuidType]]
+        | pa.ChunkedArray[pa.Scalar[pa.UuidType]],
         *,
         dtype: UuidDtype | None = None,
     ) -> None:
@@ -376,7 +378,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             # cast because of https://github.com/apache/arrow/issues/48470
             chunk = pa.array(
                 [
-                    None if pd.isna(x) else _to_uuid_pyarrow(x).cast(pa.binary(16))
+                    None if pd.isna(x) else _to_uuid_pyarrow(x).cast(pa.binary(16))  # pyright: ignore[reportArgumentType,reportGeneralTypeIssues]
                     for x in values
                 ],
                 type=pa.uuid(),
@@ -433,11 +435,11 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
                 values = self._pa_array.filter(item)
             case np.ndarray():
                 values = self._pa_array.take(item)
-            case _:
+            case _:  # pragma: no cover
                 msg = f"Unexpected indexer type: {type(item)}"
                 raise AssertionError(msg)
 
-        return self._simple_new(values)
+        return type(self)(values)
 
     # TODO: def __setitem__(self, index, value)
     # https://github.com/scverse/pandas-uuid/issues/15
@@ -456,18 +458,9 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
         values = pa.chunked_array(
             [chunk for x in to_concat for chunk in x._pa_array.chunks]  # noqa: SLF001
         )
-        return cls._simple_new(values)
+        return cls(values)
 
     # Helpers
-
-    @classmethod
-    def _simple_new(
-        cls,
-        values: pa.ChunkedArray[pa.Scalar[pa.UuidType]],
-    ) -> Self:
-        result = ArrowUuidArray.__new__(cls)
-        result._pa_array = values  # noqa: SLF001
-        return result
 
     def _cmp_method(  # pyright: ignore[reportIncompatibleMethodOverride]
         self, other: Sequence[UuidLike] | ArrowUuidArray, op: FunctionType
