@@ -30,6 +30,11 @@ def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) 
     assert arr.isna().tolist() == [False, False, True]
 
 
+def test_isna_numpy() -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype("numpy"))
+    assert arr.isna().tolist() == [False, False]
+
+
 @pytest.mark.parametrize(
     ("values", "index", "expected"),
     [
@@ -97,7 +102,7 @@ def test_take(
 
 def test_take_fill(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
     if storage == "numpy":
-        request.applymarker(pytest.mark.xfail(raises=NotImplementedError))
+        request.applymarker(pytest.mark.xfail(raises=ValueError))
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     result = arr.take([1, -1], allow_fill=True).tolist()
     assert result == [arr[1], pd.NA]

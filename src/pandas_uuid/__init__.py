@@ -16,7 +16,6 @@ import pandas as pd
 from pandas.api.extensions import ExtensionArray, ExtensionDtype
 from pandas.api.indexers import check_array_indexer
 from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
-from pandas.core.algorithms import take
 
 from . import _pyarrow as pa
 
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
 
     from pandas._libs.missing import NAType
-    from pandas._typing import AxisInt, ScalarIndexer, SequenceIndexer, TakeIndexer
+    from pandas._typing import ScalarIndexer, SequenceIndexer
     from pandas.arrays import BooleanArray
 
 
@@ -246,7 +245,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     @overload
     def __getitem__(self, item: SequenceIndexer) -> Self: ...
     @override
-    def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:
+    def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:  # pyright: ignore[reportIncompatibleMethodOverride]
         if isinstance(item, int | np.integer):
             elem = cast("np.void", self._ndarray[item])
             return UUID(bytes=elem.tobytes())
@@ -256,37 +255,11 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     # def __setitem__(self, index, value):
 
     # Some methods are implemented by NumpyExtensionArray:
-    # __len__, __eq__
-
-    @cached_property
-    @override
-    def nbytes(self) -> int:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return self._ndarray.nbytes
+    # __len__, __eq__, nbytes, take
 
     @override
     def isna(self) -> NDArray[np.bool_]:
-        return pd.isna(self._ndarray)
-
-    @override
-    def take(
-        self,
-        indices: TakeIndexer,
-        *,
-        allow_fill: bool = False,
-        fill_value: UUID | NAType | None = None,
-        axis: AxisInt = 0,
-    ) -> Self:
-        if allow_fill and fill_value is None:
-            fill_value = self.dtype.na_value
-
-        if allow_fill and not isinstance(fill_value, UUID):
-            # pandas’ take will create an object array which is not supported
-            raise NotImplementedError
-
-        result = take(
-            self._ndarray, indices, allow_fill=allow_fill, fill_value=fill_value
-        )
-        return self._simple_new(result)
+        return np.zeros(len(self), dtype=bool)
 
     @override
     def copy(self, order: Literal["C", "F", "A", "K"] = "C") -> Self:
@@ -316,6 +289,14 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
             )
             raise ValueError(msg)
         return super()._simple_new(values, dtype=dtype)
+
+    def _from_backing_data(self, values: NDArray[np.void]) -> Self:
+        if values.dtype != _UUID_NP_STORAGE_DTYPE:
+            msg = (
+                f"{type(self).__name__!r} only supports dtype={_UUID_NP_STORAGE_DTYPE}"
+            )
+            raise ValueError(msg)
+        return super()._from_backing_data(values)
 
     @override
     def _cmp_method(
