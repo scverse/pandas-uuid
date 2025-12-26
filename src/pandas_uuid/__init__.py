@@ -8,7 +8,15 @@ import sys
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Literal, TypeVar, cast, get_args, overload, override
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+    TypeVar,
+    cast,
+    get_args,
+    overload,
+    override,
+)
 from uuid import UUID
 
 import numpy as np
@@ -20,7 +28,7 @@ from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
 from . import _pyarrow as pa
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
     from types import FunctionType
     from typing import Self
 
@@ -130,6 +138,8 @@ class UuidDtype(ExtensionDtype):
 
     # ExtensionDtype overrides
 
+    index_class = pd.Index  # pandas accesses this from the class
+
     @cached_property
     @override
     def kind(self) -> Literal["O", "V"]:  # pyright: ignore[reportIncompatibleMethodOverride]
@@ -169,6 +179,13 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
     @override
     def shape(self) -> tuple[int, ...]:
         return (len(self),)
+
+    @cache
+    def _formatter(self, *, boxed: bool = False) -> Callable[[UuidLike], str]:
+        del boxed  # part of the API
+        # pandas converts to numpy object array before calling this,
+        # so we need to convert it back.
+        return lambda b: str(_to_uuid_numpy(b))
 
 
 class UuidArray(BaseUuidArray, NumpyExtensionArray):

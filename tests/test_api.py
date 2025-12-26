@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pandas_uuid import UuidArray, UuidDtype
+from pandas_uuid import ArrowUuidArray, UuidArray, UuidDtype
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
-    from pandas_uuid import ArrowUuidArray, UuidStorage
+    from pandas_uuid import UuidStorage
 
 
 def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) -> None:
@@ -194,3 +194,21 @@ def test_concat_empty(storage: UuidStorage) -> None:
     cls = UuidDtype(storage).construct_array_type()
     concat = cls._concat_same_type([])
     assert concat.tolist() == []
+
+
+@pytest.mark.parametrize("container", [pd.array, pd.Index, pd.Series])
+def test_repr(
+    storage: UuidStorage,
+    container: Callable[..., UuidArray | ArrowUuidArray | pd.Series | pd.Index],
+) -> None:
+    data = [uuid4(), uuid4()]
+    arr = container(data, dtype=UuidDtype(storage))
+    match arr:
+        case UuidArray() | ArrowUuidArray():
+            name = type(arr).__name__
+            expected = f"<{name}>\n[{data[0]}, {data[1]}]\nLength: 2, dtype: uuid"
+        case pd.Index():
+            expected = f"Index([{data[0]}, {data[1]}], dtype='uuid')"
+        case pd.Series():
+            expected = f"0    {data[0]}\n1    {data[1]}\ndtype: uuid"
+    assert repr(arr) == expected
