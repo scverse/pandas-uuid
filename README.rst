@@ -11,8 +11,6 @@
 
 Pandas ExtensionArray / ExtensionDType for UUID
 ===============================================
-Usage
------
 
 .. usage-start
 
@@ -24,7 +22,7 @@ Use `UuidDtype` as a `pandas` extension dtype:
 >>>
 >>> s = pd.Series([uuid4()], dtype=UuidDtype())
 >>> s
-0    e8f04c2e-ed42-488e-9e96-fe6c80d06bf6
+0    cd072cd8-be6f-4f62-ac4c-09c28206e7e3
 dtype: uuid
 
 .. usage-end
