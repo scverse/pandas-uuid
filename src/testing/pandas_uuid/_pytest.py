@@ -21,6 +21,8 @@ INCLUDE_RE = re.compile(r"""\
 @pytest.fixture(autouse=True)
 def _env(request: pytest.FixtureRequest) -> None:
     if isinstance(request.node, pytest.DoctestItem):
+        if any("pyarrow" in example.source for example in request.node.dtest.examples):
+            pytest.skip("pyarrow not installed")
         request.getfixturevalue("doctest_env")
 
 
