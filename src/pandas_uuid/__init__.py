@@ -8,15 +8,7 @@ import sys
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from importlib.util import find_spec
-from typing import (
-    TYPE_CHECKING,
-    Literal,
-    TypeVar,
-    cast,
-    get_args,
-    overload,
-    override,
-)
+from typing import TYPE_CHECKING, Literal, TypeVar, cast, get_args, overload, override
 from uuid import UUID
 
 import numpy as np
@@ -180,8 +172,9 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
     def shape(self) -> tuple[int, ...]:
         return (len(self),)
 
+    @staticmethod
     @cache
-    def _formatter(self, *, boxed: bool = False) -> Callable[[UuidLike], str]:
+    def _formatter(*, boxed: bool = False) -> Callable[[UuidLike], str]:
         del boxed  # part of the API
         # pandas converts to numpy object array before calling this,
         # so we need to convert it back.
