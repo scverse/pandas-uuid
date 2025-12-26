@@ -22,6 +22,7 @@ urls.Documentation = "https://icb-pandas-uuid.readthedocs.io/"
 doc = [
   "ipykernel",
   "matplotlib",          # social cards
+  "pygments",            # code higlighting
   "sphinx>=9.0.4",
   "sphinx-book-theme",
   "sphinx-copybutton",
