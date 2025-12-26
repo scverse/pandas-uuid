@@ -7,6 +7,7 @@ import doctest
 import os
 import random
 import re
+from importlib.util import find_spec
 from pathlib import Path
 
 import pytest
@@ -17,11 +18,15 @@ INCLUDE_RE = re.compile(r"""\
 \s{3,}:end-before:\s+(?P<end_before>.*)
 """)
 
+HAS_PYARROW = bool(find_spec("pyarrow"))
+
 
 @pytest.fixture(autouse=True)
 def _env(request: pytest.FixtureRequest) -> None:
     if isinstance(request.node, pytest.DoctestItem):
-        if any("pyarrow" in example.source for example in request.node.dtest.examples):
+        if not HAS_PYARROW and any(
+            "pyarrow" in example.source for example in request.node.dtest.examples
+        ):
             pytest.skip("pyarrow not installed")
         request.getfixturevalue("doctest_env")
 

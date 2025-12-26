@@ -72,7 +72,7 @@ This would have several advantages:
 #.  As mentioned before, passing a :class:`pyarrow.UuidArray`
     to any pandas API could make it automatically convert it
     to a :class:`~pandas_uuid.UuidArray`.
-    currently this results in a generic ArrowExtensionArray instead:
+    Currently this results in a generic `{Numpy,Arrow}ExtensionArray` instead:
 
     >>> pd.Series(arr)
     0    b'\xcd\x07,\xd8\xbeoOb\xacL\t\xc2\x82\x06\xe7\...
