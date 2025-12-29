@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from typing import Self
 
     import numpy.typing as npt
+    from numpy.random import Generator
     from numpy.typing import NDArray
 
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
@@ -178,7 +179,14 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
         del boxed  # part of the API
         # pandas converts to numpy object array before calling this,
         # so we need to convert it back.
-        return lambda b: str(_to_uuid_numpy(b))
+        return lambda b: str(b if pd.isna(b) else _to_uuid_numpy(b))
+
+    # Custom API
+
+    @classmethod
+    @abc.abstractmethod
+    def random(cls, size: int, *, rng: int | np.random.Generator | None = None) -> Self:
+        """Generate an array of random UUIDs."""
 
 
 class UuidArray(BaseUuidArray, NumpyExtensionArray):
@@ -338,6 +346,15 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
         return pa.array(self._ndarray, type=type)  # pyright: ignore[reportReturnType]
 
+    # Custom API
+
+    @override
+    @classmethod
+    def random(cls, size: int, *, rng: int | Generator | None = None) -> Self:
+        rng = np.random.default_rng(rng)
+        values = rng.bytes(size * 16)
+        return cls._simple_new(np.frombuffer(values, dtype=_UUID_NP_STORAGE_DTYPE))
+
 
 class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
     """Extension array for storing uuid data in a :class:`pyarrow.ChunkedArray`."""
@@ -374,7 +391,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
 
         if isinstance(values, pa.Array | pa.ChunkedArray):
             self._pa_array = (
-                pa.chunked_array([values.cast(pa.uuid())])
+                pa.chunked_array([values.view(pa.uuid())])
                 if isinstance(values, pa.Array)
                 else values.cast(pa.uuid())
             )  # pyright: ignore[reportAttributeAccessIssue]
@@ -432,9 +449,8 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
                 and isinstance(item.start, int | None)
                 and isinstance(item.stop, int | None)
             ):
-                start = item.start if item.start is not None else 0
-                length = item.stop - start if item.stop is not None else None
-                values = self._pa_array.slice(start, length)
+                r = range(len(self))[item]
+                values = self._pa_array.slice(r.start, r.stop - r.start)
             case slice():
                 item = np.array(range(len(self._pa_array))[item])
                 values = self._pa_array.take(item)
@@ -483,3 +499,17 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             other._pa_array.cast(pa.binary(16)),
         )
         return cast("BooleanArray", pd.array(result, dtype="boolean"))  # pyright: ignore[reportArgumentType]
+
+    # Custom API
+
+    @override
+    @classmethod
+    def random(cls, size: int, *, rng: int | Generator | None = None) -> Self:
+        import pyarrow as pa
+
+        # pyarrow’s random generator only does non-NaN floats, we want unbiased
+        rng = np.random.default_rng(rng)
+        values = rng.bytes(size * 16)
+        buf_vals = pa.py_buffer(values)
+        arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])
+        return cls(cast("pa.UuidArray", arr))

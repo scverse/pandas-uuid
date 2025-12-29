@@ -6,6 +6,7 @@
 ..  currentmodule:: pandas_uuid
 
 ..  autoclass:: BaseUuidArray
+    :members: random
 
 ..  autoclass:: UuidArray
 

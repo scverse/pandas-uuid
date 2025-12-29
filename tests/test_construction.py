@@ -96,7 +96,7 @@ def test_construct_array(
             "pyarrow",
             lambda pa: pa.array([datetime.now()], type=pa.timestamp("s")),  # noqa: DTZ005
             None,
-            NotImplementedError,
+            ValueError,
             id="pyarrow-dtype",
         ),
         pytest.param(

@@ -201,7 +201,7 @@ def test_repr(
     storage: UuidStorage,
     container: Callable[..., UuidArray | ArrowUuidArray | pd.Series | pd.Index],
 ) -> None:
-    data = [uuid4(), uuid4()]
+    data = [uuid4(), uuid4()] if storage == "numpy" else [uuid4(), pd.NA]
     arr = container(data, dtype=UuidDtype(storage))
     match arr:
         case UuidArray() | ArrowUuidArray():
@@ -210,5 +210,14 @@ def test_repr(
         case pd.Index():
             expected = f"Index([{data[0]}, {data[1]}], dtype='uuid')"
         case pd.Series():
-            expected = f"0    {data[0]}\n1    {data[1]}\ndtype: uuid"
+            expected = f"0    {data[0]}\n1    {data[1]!s:>36}\ndtype: uuid"
     assert repr(arr) == expected
+
+
+@pytest.mark.parametrize("n", [1, 5, 1_000])
+def test_random(storage: UuidStorage, n: int) -> None:
+    cls = UuidDtype(storage).construct_array_type()
+    arr = cls.random(n)
+    assert isinstance(arr, cls)
+    assert len(arr) == n
+    assert arr.isna().sum() == 0
