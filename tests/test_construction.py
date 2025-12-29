@@ -49,6 +49,11 @@ def test_default_storage() -> None:
     assert dtype.na_value is pd.NA
 
 
+def test_storage_error() -> None:
+    with pytest.raises(ValueError, match=r"storage.*not.*python"):
+        UuidDtype("python")  # pyright: ignore[reportArgumentType]
+
+
 @pytest.mark.parametrize(
     "arg", ["numpy", pytest.param("pyarrow", marks=skipif_no_pyarrow)]
 )
