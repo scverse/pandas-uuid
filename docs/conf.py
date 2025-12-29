@@ -87,6 +87,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 # Fix up undocumented types using the `resolve_from_map` extension
 type_map = {
     ("py", "class", "NAType"): ("attr", "pandas.NA"),
+    ("py", "class", "np.random.Generator"): ("class", "numpy.random.Generator"),
     **{
         ("py", "class", f"pa.{cls}"): ("class", f"pyarrow.{cls}")
         for cls in [
