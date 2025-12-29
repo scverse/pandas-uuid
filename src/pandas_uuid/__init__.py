@@ -111,7 +111,7 @@ class UuidDtype(ExtensionDtype):
     # Custom
 
     storage: UuidStorage = field(default_factory=_default_storage_kind)
-    """Storage kind, either `"numpy"` or `"pyarrow"`."""
+    """Storage kind, either ``"numpy"`` or ``"pyarrow"``."""
 
     def __post_init__(self) -> None:
         """Validate storage kind."""

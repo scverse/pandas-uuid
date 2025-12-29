@@ -20,6 +20,8 @@ API
     pandas_uuid.UuidStorage
     pandas_uuid.UuidLike
 
+..  currentmodule:: pandas_uuid
+
 .. _usage:
 
 Usage
@@ -72,13 +74,13 @@ This would have several advantages:
 #.  As mentioned before, passing a :class:`pyarrow.UuidArray`
     to any pandas API could make it automatically convert it
     to a :class:`~pandas_uuid.UuidArray`.
-    Currently this results in a generic `{Numpy,Arrow}ExtensionArray` instead:
+    Currently this results in a generic ``{Numpy,Arrow}ExtensionArray`` instead:
 
     >>> pd.Series(arr)
     0    b'\xcd\x07,\xd8\xbeoOb\xacL\t\xc2\x82\x06\xe7\...
     dtype: object
 
-#.  Specifying `dtype="uuid"` would work the same as `dtype=UuidDtype()`.
+#.  Specifying ``dtype="uuid"`` would work the same as ``dtype=UuidDtype()``.
     Currently it fails:
 
     >>> pd.Series([uuid4()], dtype="uuid")

@@ -61,7 +61,7 @@ autodoc_default_options = {
     "inherited-members": False,
     "show-inheritance": True,
 }
-default_role = "literal"
+default_role = "py:obj"
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = False
