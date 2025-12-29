@@ -132,8 +132,10 @@ lint.flake8-type-checking.strict = true
 strict = true
 addopts = [
   "--import-mode=importlib",
+  "--doctest-modules",
   "--doctest-glob=*.rst",
-  "--ignore-glob=**/_build/**",
+  "--ignore-glob=docs/extensions/**",
+  "--ignore-glob=docs/_build/**",
   "-ptesting.pandas_uuid._pytest",
 ]
 filterwarnings = ["error"]

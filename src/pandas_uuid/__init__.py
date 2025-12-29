@@ -186,7 +186,20 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
     @classmethod
     @abc.abstractmethod
     def random(cls, size: int, *, rng: int | np.random.Generator | None = None) -> Self:
-        """Generate an array of random UUIDs."""
+        """Generate an array of random UUIDs.
+
+        Examples
+        --------
+        .. note::
+           There is probably no good reason to ever set `rng`
+           to a static seed apart from testing.
+
+        >>> UuidArray.random(2, rng=42)
+        <UuidArray>
+        [8826d916-cdfb-21c6-c1ff-91a761565a70, 2416da6e-c212-cddb-8d88-00160eb686b2]
+        Length: 2, dtype: uuid
+
+        """
 
 
 class UuidArray(BaseUuidArray, NumpyExtensionArray):
