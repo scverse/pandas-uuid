@@ -25,6 +25,21 @@ Use `UuidDtype` as a `pandas` extension dtype:
 0    cd072cd8-be6f-4f62-ac4c-09c28206e7e3
 dtype: uuid
 
+Use specific storage types by importing `UuidArray` / `ArrowUuidArray`,
+or by using the `storage` parameter of `UuidDtype`:
+
+>>> cls = UuidDtype("numpy").construct_array_type()
+>>> cls
+<class 'pandas_uuid.UuidArray'>
+>>> cls.random(2, rng=42)
+<UuidArray>
+[8826d916-cdfb-21c6-c1ff-91a761565a70, 2416da6e-c212-cddb-8d88-00160eb686b2]
+Length: 2, dtype: uuid
+
+..  note::
+    There is probably no good reason to ever set `rng`
+    to a static seed apart from testing.
+
 .. usage-end
 
 For advanced usage, see the Documentation_.
