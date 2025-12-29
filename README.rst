@@ -26,7 +26,7 @@ Use `UuidDtype` as a `pandas` extension dtype:
 dtype: uuid
 
 Use specific storage types by importing `UuidArray` / `ArrowUuidArray`,
-or by using the `storage` parameter of `UuidDtype`:
+or by using the ``storage`` parameter of `UuidDtype`:
 
 >>> cls = UuidDtype("numpy").construct_array_type()
 >>> cls
@@ -37,7 +37,7 @@ or by using the `storage` parameter of `UuidDtype`:
 Length: 2, dtype: uuid
 
 ..  note::
-    There is probably no good reason to ever set `rng`
+    There is probably no good reason to ever set ``rng``
     to a static seed apart from testing.
 
 .. usage-end
