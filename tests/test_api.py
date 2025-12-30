@@ -3,8 +3,7 @@
 
 from __future__ import annotations
 
-from functools import partial
-from itertools import batched
+from itertools import batched, product
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
@@ -13,6 +12,7 @@ import pandas as pd
 import pytest
 
 from pandas_uuid import ArrowUuidArray, UuidArray, UuidDtype
+from pandas_uuid._pyarrow import HAS_PYARROW
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,6 +22,11 @@ if TYPE_CHECKING:
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
     from pandas_uuid import UuidStorage
+
+
+skipif_no_pyarrow = pytest.mark.skipif(
+    not HAS_PYARROW, reason="pyarrow is not installed"
+)
 
 
 def test_isna(storage: UuidStorage, xfail_if_numpy_and_na: Callable[..., None]) -> None:
@@ -122,31 +127,57 @@ def test_getitem_error(index: Any) -> None:  # noqa: ANN401
     [
         pytest.param([u0 := uuid4(), u1 := uuid4()], [u0, u1], [True] * 2, id="same"),
         pytest.param([u0, u1], [u0, u0], [True, False], id="different"),
-        pytest.param([u0, pd.NA], [u0, u1], [True, pd.NA], id="na"),
+        pytest.param([u0, pd.NA], [u0, u1], [True, pd.NA], id="na-left"),
+        pytest.param([u0, u1], [u0, pd.NA], [True, pd.NA], id="na-right"),
     ],
 )
-@pytest.mark.parametrize("is_arr", ["left", "right", "none"])
+@pytest.mark.parametrize(
+    ("storage_left", "storage_right"),
+    [
+        pytest.param(
+            left,
+            right,
+            id=f"{left}-{right}",
+            marks=skipif_no_pyarrow if "pyarrow" in (left, right) else [],
+        )
+        for left, right in product(["numpy", "pyarrow", "list"], repeat=2)
+        if left != "list" or right != "list"
+    ],
+)
 def test_eq(
-    # TODO: test unequal storage
-    # https://github.com/scverse/pandas-uuid/issues/10
-    storage: UuidStorage,
-    xfail_if_numpy_and_na: Callable[..., None],
-    left: list[UUID | None] | UuidArray | ArrowUuidArray,
-    right: list[UUID | None] | UuidArray | ArrowUuidArray,
-    is_arr: Literal["left", "right", "both"],
+    request: pytest.FixtureRequest,
+    storage_left: UuidStorage | Literal["list"],
+    storage_right: UuidStorage | Literal["list"],
+    left: list[UUID | None],
+    right: list[UUID | None],
     expected: list[bool | None],
 ) -> None:
-    xfail_if_numpy_and_na(left, right)
-    to_arr = cast(
-        "Callable[..., UuidArray | ArrowUuidArray]",
-        partial(pd.array, dtype=UuidDtype(storage)),
+    combs: list[tuple[list[UUID | None], UuidStorage | Literal["list"]]] = [
+        (left, storage_left),
+        (right, storage_right),
+    ]
+    # xfail when numpy would store NAs
+    if any(storage == "numpy" and pd.isna(values).any() for values, storage in combs):
+        request.applymarker(pytest.mark.xfail(raises=TypeError))
+    # xfail when numpy would compare to a list containing NAs
+    if all(storage != "pyarrow" for _, storage in combs) and any(
+        pd.isna(values).any() for values, _ in combs
+    ):
+        request.applymarker(pytest.mark.xfail(raises=TypeError))
+    left_conv, right_conv = (
+        values
+        if storage == "list"
+        else cast(
+            "UuidArray | ArrowUuidArray",
+            pd.array(values, dtype=UuidDtype(storage)),
+        )
+        for values, storage in combs
     )
-    if is_arr != "left":
-        right = to_arr(right)
-    if is_arr != "right":
-        left = to_arr(left)
+
+    cmp = left_conv == right_conv
+
     arr_exp = pd.array(expected, dtype="boolean")
-    pd.testing.assert_extension_array_equal(left == right, arr_exp, check_dtype=False)  # pyright: ignore[reportArgumentType]
+    pd.testing.assert_extension_array_equal(cmp, arr_exp, check_dtype=False)
 
 
 def test_shape(storage: UuidStorage) -> None:
