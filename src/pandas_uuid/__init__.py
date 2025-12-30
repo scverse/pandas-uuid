@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import abc
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from functools import cache, cached_property
 from importlib.util import find_spec
@@ -20,7 +21,7 @@ from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
 from . import _pyarrow as pa
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Sequence
     from types import FunctionType
     from typing import Self
 
@@ -85,19 +86,19 @@ def _to_uuid_numpy(v: UuidLike) -> UUID:
 
 
 def _to_uuid_pyarrow(v: UuidLike) -> pa.UuidScalar:
-    from pyarrow import scalar, uuid
+    import pyarrow as pa
 
     match v:
         case pa.UuidScalar():
             return v
         case UUID():
-            return scalar(v.bytes, type=uuid())
+            return pa.scalar(v.bytes, type=pa.uuid())
         case bytes():
             # raises a pa.ArrowInvalid error if not 16 bytes
-            return scalar(v, type=uuid())
+            return pa.scalar(v, type=pa.uuid())
         case int():
             # raises an OverflowError if v has >128 bits
-            return scalar(v.to_bytes(16), type=uuid())
+            return pa.scalar(v.to_bytes(16), type=pa.uuid())
         case str():
             return _to_uuid_pyarrow(UUID(v))
     msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
@@ -321,15 +322,19 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     @override
     def _cmp_method(
-        self, other: Sequence[UuidLike] | UuidArray, op: FunctionType
+        self, other: Sequence[UuidLike] | BaseUuidArray | UuidLike, op: FunctionType
     ) -> BooleanArray:
         if isinstance(other, ArrowUuidArray):
             return NotImplemented  # delegate to it to support NAs
-        if not isinstance(other, UuidArray):
-            other = cast("UuidArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
+        if isinstance(other, str | bytes) or not isinstance(other, Iterable):
+            cmp_target = np.void(_to_uuid_numpy(other).bytes)
+        else:
+            if not isinstance(other, UuidArray):
+                other = cast("UuidArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
+            cmp_target = other._ndarray.view(np.void(16))  # noqa: SLF001
 
         method = getattr(self._ndarray, f"__{op.__name__}__")
-        result = method(other._ndarray.view(np.void(16)))  # noqa: SLF001
+        result = method(cmp_target)
         return cast("BooleanArray", pd.array(result, dtype="boolean"))
 
     # IO
@@ -494,17 +499,20 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
     # Helpers
 
     def _cmp_method(  # pyright: ignore[reportIncompatibleMethodOverride]
-        self, other: Sequence[UuidLike] | ArrowUuidArray, op: FunctionType
+        self, other: Sequence[UuidLike] | BaseUuidArray | UuidLike, op: FunctionType
     ) -> BooleanArray:
         import pyarrow as pa
         from pandas.core.arrays.arrow.array import ARROW_CMP_FUNCS
 
-        if not isinstance(other, ArrowUuidArray):
-            other = ArrowUuidArray(other)
+        if isinstance(other, str | bytes) or not isinstance(other, Iterable):
+            cmp_target = _to_uuid_pyarrow(other)
+        else:
+            if not isinstance(other, ArrowUuidArray):
+                other = ArrowUuidArray(other)
+            cmp_target = other._pa_array
 
         result = ARROW_CMP_FUNCS[op.__name__](
-            self._pa_array.cast(pa.binary(16)),
-            other._pa_array.cast(pa.binary(16)),
+            self._pa_array.cast(pa.binary(16)), cmp_target.cast(pa.binary(16))
         )
         return cast("BooleanArray", pd.array(result, dtype="boolean"))  # pyright: ignore[reportArgumentType]
 
