@@ -177,3 +177,12 @@ def test_construct_elem_error(api: Callable[..., UuidArray | ArrowUuidArray]) ->
 def test_construct_dtype_error(api: type[UuidArray | ArrowUuidArray]) -> None:
     with pytest.raises(ValueError, match=r"support.*UuidDtype"):
         api([], dtype=object)  # pyright: ignore[reportArgumentType]
+
+
+@pytest.mark.parametrize("n", [1, 5, 1_000])
+def test_random(storage: UuidStorage, n: int) -> None:
+    cls = UuidDtype(storage).construct_array_type()
+    arr = cls.random(n)
+    assert isinstance(arr, cls)
+    assert len(arr) == n
+    assert arr.isna().sum() == 0

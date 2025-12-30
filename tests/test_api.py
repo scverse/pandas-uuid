@@ -227,6 +227,20 @@ def test_concat_empty(storage: UuidStorage) -> None:
     assert concat.tolist() == []
 
 
+def test_contains(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+    u0 = uuid4()
+    arr = pd.array(
+        [u0, uuid4(), *([] if storage == "numpy" else [pd.NA])],
+        dtype=UuidDtype(storage),
+    )
+
+    with subtests.test("contained"):
+        assert u0 in arr
+
+    with subtests.test("missing"):
+        assert uuid4() not in arr
+
+
 @pytest.mark.parametrize("container", [pd.array, pd.Index, pd.Series])
 def test_repr(
     storage: UuidStorage,
@@ -243,12 +257,3 @@ def test_repr(
         case pd.Series():
             expected = f"0    {data[0]}\n1    {data[1]!s:>36}\ndtype: uuid"
     assert repr(arr) == expected
-
-
-@pytest.mark.parametrize("n", [1, 5, 1_000])
-def test_random(storage: UuidStorage, n: int) -> None:
-    cls = UuidDtype(storage).construct_array_type()
-    arr = cls.random(n)
-    assert isinstance(arr, cls)
-    assert len(arr) == n
-    assert arr.isna().sum() == 0
