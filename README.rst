@@ -1,11 +1,13 @@
-|coverage| |docs| |tests|
+|pypi| |coverage| |docs| |tests|
 
+.. |pypi| image:: https://img.shields.io/pypi/v/pandas-uuid
+   :target: https://pypi.org/project/pandas-uuid/
 .. |coverage| image:: https://codecov.io/github/scverse/pandas-uuid/graph/badge.svg?token=R9HFDFPBID
-    :target: https://codecov.io/github/scverse/pandas-uuid
+   :target: https://codecov.io/github/scverse/pandas-uuid
 .. |docs| image:: https://app.readthedocs.com/projects/icb-pandas-uuid/badge/
-    :target: https://icb-pandas-uuid.readthedocs-hosted.com/
+   :target: https://icb-pandas-uuid.readthedocs-hosted.com/
 .. |tests| image:: https://github.com/scverse/pandas-uuid/actions/workflows/test.yml/badge.svg
-    :target: https://github.com/scverse/pandas-uuid/actions/workflows/test.yml
+   :target: https://github.com/scverse/pandas-uuid/actions/workflows/test.yml
 
 .. badges-end
 
