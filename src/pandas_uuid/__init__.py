@@ -80,7 +80,7 @@ def _to_uuid_numpy(v: UuidLike) -> UUID:
             return UUID(int=v)
         case str():
             return UUID(v)
-    msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
+    msg = f"Unknown type for Uuid: {type(v)} is not in {get_args(UuidLike.__value__)}"
     raise TypeError(msg)
 
 
@@ -323,6 +323,8 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     def _cmp_method(
         self, other: Sequence[UuidLike] | UuidArray, op: FunctionType
     ) -> BooleanArray:
+        if isinstance(other, ArrowUuidArray):
+            return NotImplemented  # delegate to it to support NAs
         if not isinstance(other, UuidArray):
             other = cast("UuidArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
 
