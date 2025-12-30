@@ -86,19 +86,19 @@ def _to_uuid_numpy(v: UuidLike) -> UUID:
 
 
 def _to_uuid_pyarrow(v: UuidLike) -> pa.UuidScalar:
-    from pyarrow import scalar, uuid
+    import pyarrow as pa
 
     match v:
         case pa.UuidScalar():
             return v
         case UUID():
-            return scalar(v.bytes, type=uuid())
+            return pa.scalar(v.bytes, type=pa.uuid())
         case bytes():
             # raises a pa.ArrowInvalid error if not 16 bytes
-            return scalar(v, type=uuid())
+            return pa.scalar(v, type=pa.uuid())
         case int():
             # raises an OverflowError if v has >128 bits
-            return scalar(v.to_bytes(16), type=uuid())
+            return pa.scalar(v.to_bytes(16), type=pa.uuid())
         case str():
             return _to_uuid_pyarrow(UUID(v))
     msg = f"Unknown type for Uuid: {type(v)} is not {get_args(UuidLike.__value__)}"
@@ -326,7 +326,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     ) -> BooleanArray:
         if isinstance(other, ArrowUuidArray):
             return NotImplemented  # delegate to it to support NAs
-        if not isinstance(other, Iterable):
+        if isinstance(other, str | bytes) or not isinstance(other, Iterable):
             cmp_target = np.void(_to_uuid_numpy(other).bytes)
         else:
             if not isinstance(other, UuidArray):
@@ -504,7 +504,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
         import pyarrow as pa
         from pandas.core.arrays.arrow.array import ARROW_CMP_FUNCS
 
-        if not isinstance(other, Iterable):
+        if isinstance(other, str | bytes) or not isinstance(other, Iterable):
             cmp_target = _to_uuid_pyarrow(other)
         else:
             if not isinstance(other, ArrowUuidArray):

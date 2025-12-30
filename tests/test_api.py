@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
-    from pandas_uuid import UuidStorage
+    from pandas_uuid import UuidLike, UuidStorage
 
 
 skipif_no_pyarrow = pytest.mark.skipif(
@@ -227,18 +227,15 @@ def test_concat_empty(storage: UuidStorage) -> None:
     assert concat.tolist() == []
 
 
-def test_contains(subtests: pytest.Subtests, storage: UuidStorage) -> None:
+def test_contains(storage: UuidStorage, to_scalar: Callable[[UUID], UuidLike]) -> None:
     u0 = uuid4()
     arr = pd.array(
         [u0, uuid4(), *([] if storage == "numpy" else [pd.NA])],
         dtype=UuidDtype(storage),
     )
 
-    with subtests.test("contained"):
-        assert u0 in arr
-
-    with subtests.test("missing"):
-        assert uuid4() not in arr
+    assert to_scalar(u0) in arr
+    assert to_scalar(uuid4()) not in arr
 
 
 @pytest.mark.parametrize("container", [pd.array, pd.Index, pd.Series])

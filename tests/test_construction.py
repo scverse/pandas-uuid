@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
     from pandas._typing import Dtype as PdDtype
 
+    import pandas_uuid._pyarrow as pa
     from pandas_uuid import UuidLike, UuidStorage
 
 
@@ -71,9 +72,9 @@ def test_construct_array(
         case "numpy":
             store = np.array([v.bytes for v in values], dtype=np.void(16))
         case "pyarrow":
-            from pyarrow import uuid
+            import pyarrow as pa
 
-            store = pa.array([v.bytes for v in values], type=uuid())
+            store = pa.array([v.bytes for v in values], type=pa.uuid())
 
     arr = api(store)
     assert arr.dtype == UuidDtype(storage)
@@ -141,30 +142,12 @@ def test_from_backing_data_error() -> None:
         UuidArray([])._from_backing_data(np.ndarray([], dtype=object))  # pyright: ignore[reportArgumentType]  # noqa: SLF001
 
 
-try:
-    import pyarrow as pa
-except ImportError:
-    pa_uuid = None
-else:
-    pa_uuid = pa.scalar(uuid4().bytes, type=pa.uuid())
-
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        pytest.param(uuid4(), id="uuid"),
-        pytest.param(uuid4().bytes, id="bytes"),
-        pytest.param(5, id="int"),
-        pytest.param(str(uuid4()), id="str"),
-        pytest.param(pa_uuid, marks=skipif_no_pyarrow, id="pyarrow"),
-    ],
-)
 def test_construct_elem(
     api: Callable[..., UuidArray | ArrowUuidArray],
     storage: UuidStorage,
-    value: UuidLike,
+    to_scalar: Callable[[UuidLike], UuidLike],
 ) -> None:
-    arr = api([value])
+    arr = api([to_scalar(uuid4())])
     assert arr.dtype == UuidDtype(storage)
 
 
