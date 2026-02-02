@@ -19,6 +19,7 @@ from pandas.api.indexers import check_array_indexer
 from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
 
 from . import _pyarrow as pa
+from .bits import set_bits
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -113,6 +114,8 @@ class UuidDtype(ExtensionDtype):
 
     storage: UuidStorage = field(default_factory=_default_storage_kind)
     """Storage kind, either ``"numpy"`` or ``"pyarrow"``."""
+
+    version: int = 4
 
     def __post_init__(self) -> None:
         """Validate storage kind."""
@@ -365,8 +368,13 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     @classmethod
     def random(cls, size: int, *, rng: int | Generator | None = None) -> Self:
         rng = np.random.default_rng(rng)
-        values = rng.bytes(size * 16)
-        return cls._simple_new(np.frombuffer(values, dtype=_UUID_NP_STORAGE_DTYPE))
+        array = rng.integers(0, 2**32, size=size * 4, dtype=np.uint32).view(
+            _UUID_NP_STORAGE_DTYPE
+        )
+        # https://datatracker.ietf.org/doc/html/rfc9562.html#section-5.8
+        set_bits(array, 48, 51, pat=0b0100, out=array)
+        set_bits(array, 64, 65, pat=0b10, out=array)
+        return cls._simple_new(array)
 
 
 class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
