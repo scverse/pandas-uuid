@@ -535,5 +535,6 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
         rng = np.random.default_rng(rng)
         values = rng.bytes(size * 16)
         buf_vals = pa.py_buffer(values)
+        # TODO: version  # noqa: TD003
         arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])
         return cls(cast("pa.UuidArray", arr))

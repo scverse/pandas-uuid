@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -19,12 +19,34 @@ __all__ = ["bits"]
 
 @dataclass(frozen=True)
 class bits:  # noqa: N801
-    """Element-wise bit accessor: `bac(arr)[start:stop] = 0b…`."""
+    """Element-wise bit accessor.
+
+    Works on any dtype that accepts arbitrary byte patterns,
+    i.e. void, bytes, and unsigned integers.
+
+    Examples
+    --------
+    >>> arr = np.array([0b00000000, 0b11111111], dtype=np.uint8)
+    >>> bits(arr)[2:6] = 0b0011
+    >>> [f"{e:08b}" for e in arr]
+    ['00001100', '11001111']
+
+    """
 
     arr: NDArray
+    _: KW_ONLY
+    force: bool = False
+
+    def __post_init__(self) -> None:  # noqa: D105
+        if not self.force and (
+            self.arr.dtype.kind not in {"u", "V", "S"}
+            or self.arr.dtype.fields is not None
+        ):
+            msg = f"dtype must be  {self.arr.dtype}"
+            raise TypeError(msg)
 
     def __setitem__(self, s: slice[int, int, Literal[1] | None], pat: int, /) -> None:
-        """Set bits `start:stop` to `pat`."""
+        """Set each element’s bits `s.start:s.stop` to `pat`."""
         if not isinstance(s, slice) or s.step not in {1, None}:
             msg = f"index must be a range with step 1/None, not {s!r}"
             raise TypeError(msg)
