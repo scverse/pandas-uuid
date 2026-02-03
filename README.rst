@@ -35,7 +35,7 @@ or by using the ``storage`` parameter of `UuidDtype`:
 <class 'pandas_uuid.UuidArray'>
 >>> cls.random(2, rng=42)
 <UuidArray>
-[8826d916-cdfb-21c6-c1ff-91a761565a70, 2416da6e-c212-cddb-8d88-00160eb686b2]
+[8826d916-cdfb-41c6-81ff-91a761565a70, 2416da6e-c212-4ddb-8d88-00160eb686b2]
 Length: 2, dtype: uuid
 
 ..  note::
