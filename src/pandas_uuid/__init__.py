@@ -19,7 +19,7 @@ from pandas.api.indexers import check_array_indexer
 from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
 
 from . import _pyarrow as pa
-from .bits import set_bits
+from .bits import bac
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -372,8 +372,8 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
             _UUID_NP_STORAGE_DTYPE
         )
         # https://datatracker.ietf.org/doc/html/rfc9562.html#section-5.8
-        set_bits(array, 48, 51, pat=0b0100, out=array)
-        set_bits(array, 64, 65, pat=0b10, out=array)
+        bac(array)[48:52] = 0b0100
+        bac(array)[64:66] = 0b10
         return cls._simple_new(array)
 
 
