@@ -195,7 +195,13 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def random(cls, size: int, *, rng: int | np.random.Generator | None = None) -> Self:
+    def random(
+        cls,
+        size: int,
+        *,
+        rng: int | np.random.Generator | None = None,
+        dtype: UuidDtype | None = None,
+    ) -> Self:
         """Generate an array of random UUIDs."""
 
 
@@ -206,6 +212,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     _typ = "extension"  # undo numpy extension array hack
     _ndarray: NDArray[np.void]
+    _dtype: UuidDtype
 
     def __init__(
         self,
@@ -247,13 +254,13 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
             raise ValueError(msg)
 
         super().__init__(values)
+        self._dtype = UuidDtype(storage="numpy") if dtype is None else dtype
 
     # ExtensionArray essential API (11 class attrs and methods)
 
-    @cached_property
     @override
     def dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleMethodOverride]
-        return UuidDtype(storage="numpy")
+        return self._dtype
 
     @override
     @classmethod
@@ -366,7 +373,16 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     @override
     @classmethod
-    def random(cls, size: int, *, rng: int | Generator | None = None) -> Self:
+    def random(
+        cls,
+        size: int,
+        *,
+        rng: int | Generator | None = None,
+        dtype: UuidDtype | None = None,
+    ) -> Self:
+        if dtype is not None and dtype.version != 4:  # noqa: PLR2004
+            msg = "Only UUID version 4 is supported"
+            raise RuntimeError(msg)
         rng = np.random.default_rng(rng)
         array = rng.integers(0, 2**32, size=size * 4, dtype=np.uint32).view(
             _UUID_NP_STORAGE_DTYPE
@@ -374,13 +390,14 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         # https://datatracker.ietf.org/doc/html/rfc9562.html#section-5.8
         bits(array)[48:52] = 0b0100  # set first four bits of byte 6 to (UUID version) 4
         bits(array)[64:66] = 0b10  # set first two bits of byte 8 to (UUID variant) 2
-        return cls._simple_new(array)
+        return cls._simple_new(array, dtype)
 
 
 class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
     """Extension array for storing uuid data in a :class:`pyarrow.ChunkedArray`."""
 
     _pa_array: pa.ChunkedArray[pa.UuidScalar]
+    _dtype: UuidDtype
 
     def __init__(
         self,
@@ -429,11 +446,11 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
                 type=pa.uuid(),
             )
             self._pa_array = pa.chunked_array([chunk])  # pyright: ignore[reportAttributeAccessIssue]
+        self._dtype = dtype if dtype is not None else UuidDtype("pyarrow")
 
-    @cached_property
     @override
     def _dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleVariableOverride]
-        return UuidDtype(storage="pyarrow")
+        return self._dtype
 
     # ExtensionArray essential API (11 class attrs and methods)
 
@@ -528,13 +545,23 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
 
     @override
     @classmethod
-    def random(cls, size: int, *, rng: int | Generator | None = None) -> Self:
+    def random(
+        cls,
+        size: int,
+        *,
+        rng: int | Generator | None = None,
+        dtype: UuidDtype | None = None,
+    ) -> Self:
         import pyarrow as pa
+
+        if dtype is not None and dtype.version != 4:  # noqa: PLR2004
+            msg = "Only UUID version 4 is supported"
+            raise RuntimeError(msg)
 
         # pyarrow’s random generator only does non-NaN floats, we want unbiased
         rng = np.random.default_rng(rng)
         values = rng.bytes(size * 16)
         buf_vals = pa.py_buffer(values)
-        # TODO: version  # noqa: TD003
+        # TODO: set v4 bits  # noqa: TD003
         arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])
-        return cls(cast("pa.UuidArray", arr))
+        return cls(cast("pa.UuidArray", arr), dtype=dtype)
