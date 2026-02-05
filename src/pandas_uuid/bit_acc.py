@@ -38,6 +38,8 @@ class bits:  # noqa: N801
     force: bool = False
 
     def __post_init__(self) -> None:  # noqa: D105
+        if self.arr.ndim != 1:
+            raise NotImplementedError
         if not self.force and (
             self.arr.dtype.kind not in {"u", "V", "S"}
             or self.arr.dtype.fields is not None
@@ -50,14 +52,14 @@ class bits:  # noqa: N801
         if not isinstance(s, slice) or s.step not in {1, None}:
             msg = f"index must be a range with step 1/None, not {s!r}"
             raise TypeError(msg)
-        if (i_byte := s.start // 8) != (s.stop - 1) // 8:
-            msg = "n and m must be in the same byte"
-            raise ValueError(msg)
         # create a mutable view into the to-be-modified bytes
-        v = self.arr.view(np.uint8)[i_byte :: self.arr.dtype.itemsize]
-        # adjust the slice to fit into the byte
-        s = slice(*(np.uint8(x % 8) for x in (s.start, s.stop)))
+        v = self.arr.view(np.uint8).reshape(-1, self.arr.itemsize)
+        end = self.arr.itemsize * 8
         # zero out the bits we want to replace
-        v &= ~np.uint8((2 ** (s.stop - s.start) - 1) << (8 - s.stop))
+        v &= ~self._to_scalar_array((2 ** (s.stop - s.start) - 1) << (end - s.stop))
         # set the new bits
-        v |= pat << (8 - s.stop)
+        v |= self._to_scalar_array(pat << (end - s.stop))
+
+    def _to_scalar_array(self, val: int) -> NDArray[np.uint8]:
+        n = self.arr.itemsize
+        return np.array([val.to_bytes(n)], dtype=f"V{n}").view(np.uint8).reshape(-1, n)

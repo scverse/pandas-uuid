@@ -17,11 +17,13 @@ import pandas as pd
 from pandas.api.extensions import ExtensionArray, ExtensionDtype
 from pandas.api.indexers import check_array_indexer
 from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
+from pandas.core.arrays.numpy_ import NDArrayBackedExtensionArray
 
 from . import _pyarrow as pa
 from .bit_acc import bits
 
 if TYPE_CHECKING:
+    import builtins
     from collections.abc import Callable, Sequence
     from types import FunctionType
     from typing import Self
@@ -55,7 +57,7 @@ from a sequence.
 """
 
 if TYPE_CHECKING or sys.version_info >= (3, 13):
-    _DT = TypeVar("_DT", bound="pa.DataType", default=pa.UuidType)
+    _DT = TypeVar("_DT", bound="pa.DataType", default=pa.UuidType)  # ty:ignore[invalid-legacy-type-variable]
 else:  # pragma: no cover
     _DT = TypeVar("_DT", bound="pa.DataType")
 
@@ -127,16 +129,16 @@ class UuidDtype(ExtensionDtype):
 
     @cached_property
     @override
-    def name(self) -> Literal["uuid"]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def name(self) -> Literal["uuid"]:
         return "uuid"
 
     @cached_property
     @override
-    def type(self) -> type[UUID]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def type(self) -> builtins.type[UUID]:
         return UUID
 
     @override
-    def construct_array_type(self) -> type[UuidArray | ArrowUuidArray]:
+    def construct_array_type(self) -> builtins.type[UuidArray | ArrowUuidArray]:
         return UuidArray if self.storage == "numpy" else ArrowUuidArray
 
     # ExtensionDtype overrides
@@ -145,7 +147,7 @@ class UuidDtype(ExtensionDtype):
 
     @cached_property
     @override
-    def kind(self) -> Literal["O", "V"]:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def kind(self) -> Literal["O", "V"]:
         """Return the dtype’s kind.
 
         Should be `"V"`, but `"O"` is used because of `pandas-dev/pandas#54810`_.
@@ -156,7 +158,7 @@ class UuidDtype(ExtensionDtype):
 
     @cached_property
     @override
-    def na_value(self) -> NAType:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def na_value(self) -> NAType:
         """Returns :attr:`pandas.NA`, i.e. this dtype has missing value semantics."""
         return pd.NA
 
@@ -239,7 +241,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
         # we treat object arrays as sequences (we can’t efficiently convert)
         if isinstance(values, np.ndarray) and values.dtype.kind != "O":
-            values = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
+            values = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)  # ty:ignore[no-matching-overload]
         else:
             # TODO: make construction from elements more efficient
             #       (both numpy and pyarrow)
@@ -253,24 +255,26 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
             msg = "Array only supports 1-dimensional arrays"
             raise ValueError(msg)
 
-        super().__init__(values)
-        self._dtype = UuidDtype(storage="numpy") if dtype is None else dtype
+        NDArrayBackedExtensionArray.__init__(
+            self, values, UuidDtype(storage="numpy") if dtype is None else dtype
+        )
 
     # ExtensionArray essential API (11 class attrs and methods)
 
     @override
-    def dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleMethodOverride]
+    @property
+    def dtype(self) -> UuidDtype:
         return self._dtype
 
     @override
     @classmethod
-    def _from_sequence(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _from_sequence(
         cls,
         scalars: Iterable[UuidLike],
         *,
         dtype: UuidDtype | None = None,
         copy: bool = False,
-    ) -> Self:
+    ) -> Self:  # ty:ignore[invalid-method-override]
         return cls(scalars, copy=copy, dtype=dtype)
 
     @overload
@@ -278,7 +282,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     @overload
     def __getitem__(self, item: SequenceIndexer) -> Self: ...
     @override
-    def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def __getitem__(self, item: ScalarIndexer | SequenceIndexer) -> Self | UUID:  # ty:ignore[invalid-method-override]
         if isinstance(item, int | np.integer):
             elem = cast("np.void", self._ndarray[item])
             return UUID(bytes=elem.tobytes())
@@ -297,7 +301,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     @override
     @classmethod
-    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # ty:ignore[invalid-method-override]
         if len(to_concat) == 0:
             return cls([])
         values = np.concatenate([x._ndarray for x in to_concat])  # noqa: SLF001
@@ -307,9 +311,9 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     @override
     @classmethod
-    def _simple_new(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _simple_new(
         cls, values: NDArray[np.void], dtype: UuidDtype | None = None
-    ) -> Self:
+    ) -> Self:  # ty:ignore[invalid-method-override]
         if dtype is None:
             dtype = UuidDtype(storage="numpy")
         elif not isinstance(dtype, UuidDtype) or dtype.storage != "numpy":
@@ -340,7 +344,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
             cmp_target = np.void(_to_uuid_numpy(other).bytes)
         else:
             if not isinstance(other, UuidArray):
-                other = cast("UuidArray", pd.array(other, dtype=self.dtype))  # pyright: ignore[reportAssignmentType]
+                other = cast("UuidArray", pd.array(other, dtype=self.dtype))  # ty:ignore[invalid-argument-type]
             cmp_target = other._ndarray.view(np.void(16))  # noqa: SLF001
 
         method = getattr(self._ndarray, f"__{op.__name__}__")
@@ -353,7 +357,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     def __arrow_array__(self, type: pa.UuidType | None = None) -> pa.UuidArray: ...
     @overload
     def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
-    def __arrow_array__(  # pyright: ignore[reportInconsistentOverload]
+    def __arrow_array__(
         self,
         type: _DT | None = None,  # noqa: A002
     ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
@@ -365,9 +369,9 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         import pyarrow as pa
 
         if type is None:
-            type = pa.uuid()  # pyright: ignore[reportAssignmentType] # noqa: A001
+            type = pa.uuid()  # ty:ignore[invalid-assignment]  # noqa: A001
 
-        return pa.array(self._ndarray, type=type)  # pyright: ignore[reportReturnType]
+        return pa.array(self._ndarray, type=type)  # ty:ignore[invalid-return-type]
 
     # Custom API
 
@@ -428,43 +432,45 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             raise NotImplementedError
 
         if isinstance(values, pa.Array | pa.ChunkedArray):
-            self._pa_array = (
+            self._pa_array = (  # ty:ignore[invalid-assignment]
                 pa.chunked_array([values.view(pa.uuid())])
                 if isinstance(values, pa.Array)
-                else values.cast(pa.uuid())
-            )  # pyright: ignore[reportAttributeAccessIssue]
+                else values.cast(pa.uuid())  # ty:ignore[no-matching-overload]
+            )
         else:
             # TODO: make construction from elements more efficient
             #       (both numpy and pyarrow)
             # https://github.com/scverse/pandas-uuid/issues/2
             # cast because of https://github.com/apache/arrow/issues/48470
-            chunk = pa.array(
-                [
-                    None if pd.isna(x) else _to_uuid_pyarrow(x).cast(pa.binary(16))  # pyright: ignore[reportArgumentType,reportGeneralTypeIssues]
-                    for x in values
-                ],
-                type=pa.uuid(),
+            chunk = cast(
+                "pa.Array[pa.UuidScalar]",
+                pa.array(
+                    [
+                        None if pd.isna(x) else _to_uuid_pyarrow(x).cast(pa.binary(16))  # ty:ignore[invalid-argument-type]
+                        for x in values
+                    ],
+                    type=pa.uuid(),
+                ),
             )
-            self._pa_array = pa.chunked_array([chunk])  # pyright: ignore[reportAttributeAccessIssue]
+            self._pa_array = pa.chunked_array([chunk])  # ty:ignore[invalid-assignment]
         self._dtype = dtype if dtype is not None else UuidDtype("pyarrow")
-
-    @override
-    def _dtype(self) -> UuidDtype:  # pyright: ignore[reportIncompatibleVariableOverride]
-        return self._dtype
 
     # ExtensionArray essential API (11 class attrs and methods)
 
-    dtype: UuidDtype  # pyright: ignore[reportIncompatibleMethodOverride]
+    @override
+    @property
+    def dtype(self) -> UuidDtype:
+        return self._dtype
 
     @override
     @classmethod
-    def _from_sequence(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _from_sequence(
         cls,
         scalars: Iterable[UuidLike],
         *,
         dtype: UuidDtype | None = None,
         copy: bool = False,
-    ) -> Self:
+    ) -> Self:  # ty:ignore[invalid-method-override]
         del copy  # part of the API, but underlying array is readonly
         return cls(scalars, dtype=dtype)
 
@@ -475,9 +481,9 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
     @override
     def __getitem__(
         self, item: ScalarIndexer | SequenceIndexer
-    ) -> Self | UUID | NAType:
+    ) -> Self | UUID | NAType:  # ty:ignore[invalid-method-override]
         if isinstance(item, int | np.integer):
-            elem = cast("pa.UuidScalar", self._pa_array[item])  # pyright: ignore[reportArgumentType, reportCallIssue]
+            elem = cast("pa.UuidScalar", self._pa_array[item])
             return elem.as_py() if elem.is_valid else self.dtype.na_value
 
         item = check_array_indexer(self, item)
@@ -510,7 +516,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
 
     @override
     @classmethod
-    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # ty:ignore[invalid-method-override]
         if len(to_concat) == 0:
             return cls([])
         import pyarrow as pa
@@ -519,13 +525,13 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
         values = pa.chunked_array(
             [chunk for x in to_concat for chunk in x._pa_array.chunks]  # noqa: SLF001
         )
-        return cls(values)
+        return cls(values)  # ty:ignore[invalid-argument-type]
 
     # Helpers
 
-    def _cmp_method(  # pyright: ignore[reportIncompatibleMethodOverride]
+    def _cmp_method(
         self, other: Sequence[UuidLike] | BaseUuidArray | UuidLike, op: FunctionType
-    ) -> BooleanArray:
+    ) -> BooleanArray:  # ty:ignore[invalid-method-override]
         import pyarrow as pa
         from pandas.core.arrays.arrow.array import ARROW_CMP_FUNCS
 
@@ -533,13 +539,13 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             cmp_target = _to_uuid_pyarrow(other)
         else:
             if not isinstance(other, ArrowUuidArray):
-                other = ArrowUuidArray(other)
+                other = ArrowUuidArray(other)  # ty:ignore[invalid-argument-type]
             cmp_target = other._pa_array
 
         result = ARROW_CMP_FUNCS[op.__name__](
             self._pa_array.cast(pa.binary(16)), cmp_target.cast(pa.binary(16))
         )
-        return cast("BooleanArray", pd.array(result, dtype="boolean"))  # pyright: ignore[reportArgumentType]
+        return cast("BooleanArray", pd.array(result, dtype="boolean"))  # ty:ignore[invalid-argument-type]
 
     # Custom API
 
@@ -563,5 +569,5 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
         values = rng.bytes(size * 16)
         buf_vals = pa.py_buffer(values)
         # TODO: set v4 bits  # noqa: TD003
-        arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])
+        arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])  # ty:ignore[invalid-argument-type]
         return cls(cast("pa.UuidArray", arr), dtype=dtype)
