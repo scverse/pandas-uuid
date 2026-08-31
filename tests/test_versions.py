@@ -99,9 +99,10 @@ def test_construct_version_mismatch(storage: UuidStorage) -> None:
         cls([uuid4(), uuid1(), uuid4()], dtype=UuidDtype(storage, 4))
 
 
-def test_construct_version_match(storage: UuidStorage) -> None:
+@pytest.mark.parametrize("length", [0, 2])
+def test_construct_version_match(storage: UuidStorage, length: int) -> None:
     dtype = UuidDtype(storage, 4)
-    arr = dtype.construct_array_type()([uuid4(), uuid4()], dtype=dtype)
+    arr = dtype.construct_array_type()([uuid4() for _ in range(length)], dtype=dtype)
     assert arr.dtype.version == 4
 
 
