@@ -3,17 +3,13 @@ ci:
 
 repos:
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.10
+    rev: v0.16.4
     hooks:
     -   id: ruff-check
         args: ["--fix"]
     -   id: ruff-format
-    # The following can be removed once these rules are out of preview
-    -   name: ruff preview rules
-        id: ruff-check
-        args: ["--preview", "--select=CPY,PLR0917"]
 -   repo: https://github.com/biomejs/pre-commit
-    rev: v2.3.10
+    rev: v2.5.10
     hooks:
     -   id: biome-format
 -   repo: https://github.com/ComPWA/taplo-pre-commit
