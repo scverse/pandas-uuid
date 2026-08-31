@@ -34,6 +34,11 @@ def test_dtype_from_string_error(string: str) -> None:
         UuidDtype.construct_from_string(string)
 
 
+def test_dtype_from_string_type_error() -> None:
+    with pytest.raises(TypeError, match=r"expects a string"):
+        UuidDtype.construct_from_string(1)  # ty:ignore[invalid-argument-type]
+
+
 @pytest.mark.parametrize("version", [0, 9, -1])
 def test_dtype_bad_version(version: int) -> None:
     with pytest.raises(ValueError, match=r"version must be None or in 1–8"):
