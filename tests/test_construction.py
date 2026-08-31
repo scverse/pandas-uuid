@@ -35,7 +35,7 @@ def api(
 ) -> Callable[..., UuidArray | ArrowUuidArray]:
     match request.param, storage:
         case "pd.array", _:
-            return partial(pd.array, dtype=UuidDtype(storage))  # pyright: ignore[reportReturnType]
+            return partial(pd.array, dtype=UuidDtype(storage))  # ty:ignore[invalid-return-type]
         case "type", "numpy":
             return UuidArray
         case "type", "pyarrow":
@@ -52,7 +52,7 @@ def test_default_storage() -> None:
 
 def test_storage_error() -> None:
     with pytest.raises(ValueError, match=r"storage.*not.*python"):
-        UuidDtype("python")  # pyright: ignore[reportArgumentType]
+        UuidDtype("python")  # ty:ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize(
@@ -129,12 +129,12 @@ def test_construct_array_error(
 
     api = dict(numpy=UuidArray, pyarrow=ArrowUuidArray)[storage]
     with pytest.raises(exc_cls):
-        api(mk_arr(), dtype=dtype)
+        api(mk_arr(), dtype=dtype)  # ty:ignore[invalid-argument-type]
 
 
 def test_simple_new_error() -> None:
     with pytest.raises(ValueError, match=r"support.*UuidDtype"):
-        UuidArray._simple_new(np.ndarray([]), dtype=object)  # pyright: ignore[reportArgumentType]  # noqa: SLF001
+        UuidArray._simple_new(np.ndarray([]), dtype=object)  # ty:ignore[invalid-argument-type]  # noqa: SLF001
 
 
 def test_from_backing_data_error() -> None:
@@ -159,7 +159,7 @@ def test_construct_elem_error(api: Callable[..., UuidArray | ArrowUuidArray]) ->
 @pytest.mark.parametrize("api", [UuidArray, ArrowUuidArray])
 def test_construct_dtype_error(api: type[UuidArray | ArrowUuidArray]) -> None:
     with pytest.raises(ValueError, match=r"support.*UuidDtype"):
-        api([], dtype=object)  # pyright: ignore[reportArgumentType]
+        api([], dtype=object)  # ty:ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize("n", [1, 5, 1_000])

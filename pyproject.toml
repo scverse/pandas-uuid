@@ -79,6 +79,12 @@ matrix.deps.env-vars = [
   ] },
 ]
 
+[tool.hatch.envs.hatch-check-types]
+dependencies = ["ty", "pytest"]
+features = ["pyarrow"]
+dependency-groups = ["typing"]
+scripts.check = "ty check {args}"
+
 [tool.ruff]
 src = ["src"]
 extend-include = ["*.ipynb"]
@@ -113,11 +119,12 @@ lint.per-file-ignores."tests/*" = [
   "D105",    # Missing docstring in magic method
   "INP001",  # __init__.py
   "PLR0913", # Test may have many arguments
+  "PLR2004", # Comparing against literals is the point of a test
   "PLR0917", # Positional or keyword means nothing for tests
   "RUF018",  # assert with := is fine
   "S101",    # Use of assert
 ]
-lint.allowed-confusables = ["×", "’"]
+lint.allowed-confusables = ["×", "’", "–"]
 lint.flake8-copyright.notice-rgx = "SPDX-License-Identifier: MPL-2\\.0"
 lint.isort.known-first-party = ["pandas_uuid"]
 lint.isort.required-imports = ["from __future__ import annotations"]
@@ -125,6 +132,10 @@ lint.pylint.max-args = 7
 lint.pylint.max-positional-args = 3
 lint.flake8-type-checking.exempt-modules = []
 lint.flake8-type-checking.strict = true
+
+[tool.ty.src]
+# docs/ needs the `doc` dependency group to resolve sphinx
+include = ["src", "tests"]
 
 [tool.pytest]
 strict = true

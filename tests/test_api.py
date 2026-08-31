@@ -213,7 +213,7 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
     arrays = [
         pd.array([uuid4() for _ in range(batch_len)], dtype=dtype) for _ in range(4)
     ]
-    concat = dtype.construct_array_type()._concat_same_type(arrays)  # noqa: SLF001
+    concat = dtype.construct_array_type()._concat_same_type(arrays)  # ty:ignore[invalid-argument-type]  # noqa: SLF001
     for i, (expected, batch) in enumerate(
         zip(arrays, batched(concat, batch_len), strict=True)
     ):
