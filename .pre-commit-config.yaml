@@ -1,33 +1,42 @@
 ci:
   autoupdate_commit_msg: "ci: pre-commit autoupdate"
+  skip: [ty] # needs hatch to build an env with the project’s deps
 
 repos:
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.4
-    hooks:
-    -   id: ruff-check
-        args: ["--fix"]
-    -   id: ruff-format
--   repo: https://github.com/biomejs/pre-commit
-    rev: v2.5.10
-    hooks:
-    -   id: biome-format
--   repo: https://github.com/ComPWA/taplo-pre-commit
-    rev: v0.9.3
-    hooks:
-    -   id: taplo-format
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-    -   id: trailing-whitespace
-        exclude: tests/_data
-    -   id: end-of-file-fixer
-        exclude: tests/_data
-    -   id: check-added-large-files
-    -   id: check-case-conflict
-    -   id: check-toml
-    -   id: check-yaml
-    -   id: check-merge-conflict
-    -   id: detect-private-key
-    -   id: no-commit-to-branch
-        args: ["--branch=main"]
+- repo: local
+  hooks:
+  - id: ty
+    name: ty
+    entry: hatch check types
+    language: system
+    types: [python]
+    pass_filenames: false # whole-program analysis
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.16.4
+  hooks:
+  - id: ruff-check
+    args: ["--fix"]
+  - id: ruff-format
+- repo: https://github.com/biomejs/pre-commit
+  rev: v2.5.10
+  hooks:
+  - id: biome-format
+- repo: https://github.com/ComPWA/taplo-pre-commit
+  rev: v0.9.3
+  hooks:
+  -   id: taplo-format
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: trailing-whitespace
+    exclude: tests/_data
+  - id: end-of-file-fixer
+    exclude: tests/_data
+  - id: check-added-large-files
+  - id: check-case-conflict
+  - id: check-toml
+  - id: check-yaml
+  - id: check-merge-conflict
+  - id: detect-private-key
+  - id: no-commit-to-branch
+    args: ["--branch=main"]

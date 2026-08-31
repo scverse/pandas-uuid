@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import abc
+import re
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -20,7 +21,14 @@ from pandas.arrays import ArrowExtensionArray, NumpyExtensionArray
 from pandas.core.arrays.numpy_ import NDArrayBackedExtensionArray
 
 from . import _pyarrow as pa
-from .bit_acc import bits
+from ._versions import (
+    NP_STORAGE_DTYPE,
+    VERSIONS,
+    arrow_to_void,
+    check_version,
+    random_values,
+    version_for,
+)
 
 if TYPE_CHECKING:
     import builtins
@@ -61,8 +69,7 @@ if TYPE_CHECKING or sys.version_info >= (3, 13):
 else:  # pragma: no cover
     _DT = TypeVar("_DT", bound="pa.DataType")
 
-# 16 void bytes: 128 bit, every pattern valid, no funky behavior like 0 stripping.
-_UUID_NP_STORAGE_DTYPE: np.dtype[np.void] = np.dtype("V16")
+_DTYPE_STRING_RE = re.compile(r"uuid(?:\[(?P<version>\d+)\])?")
 
 
 @cache
@@ -117,20 +124,36 @@ class UuidDtype(ExtensionDtype):
     storage: UuidStorage = field(default_factory=_default_storage_kind)
     """Storage kind, either ``"numpy"`` or ``"pyarrow"``."""
 
-    version: int = 4
+    version: int | None = None
+    """UUID version of the array’s elements, or `None` to not specify one.
+
+    The version determines how the 128 bits are to be interpreted:
+    UUIDv7’s leading 48 bits are a Unix timestamp in milliseconds,
+    while UUIDv4 is random throughout (see `RFC 9562`_).
+    Specifying it constrains both generation and construction.
+
+    .. _RFC 9562: https://datatracker.ietf.org/doc/html/rfc9562#section-4
+    """
 
     def __post_init__(self) -> None:
-        """Validate storage kind."""
+        """Validate storage kind and version."""
         if self.storage not in {"numpy", "pyarrow"}:
             msg = f"storage must be 'numpy' or 'pyarrow', not {self.storage}"
+            raise ValueError(msg)
+        if self.version is not None and self.version not in VERSIONS:
+            msg = (
+                f"version must be None or in "
+                f"{VERSIONS.start}–{VERSIONS.stop - 1}, not {self.version}"
+            )
             raise ValueError(msg)
 
     # ExtensionDtype essential API (3 class attrs and methods)
 
     @cached_property
     @override
-    def name(self) -> Literal["uuid"]:
-        return "uuid"
+    def name(self) -> str:
+        """``"uuid"``, or ``"uuid[<version>]"`` if `version` is specified."""
+        return "uuid" if self.version is None else f"uuid[{self.version}]"
 
     @cached_property
     @override
@@ -140,6 +163,34 @@ class UuidDtype(ExtensionDtype):
     @override
     def construct_array_type(self) -> builtins.type[UuidArray | ArrowUuidArray]:
         return UuidArray if self.storage == "numpy" else ArrowUuidArray
+
+    @override
+    @classmethod
+    def construct_from_string(cls, string: str) -> Self:
+        """Construct from ``"uuid"`` or ``"uuid[<version>]"``.
+
+        The storage kind is not part of the string, i.e. it stays the default one.
+
+        Examples
+        --------
+        >>> UuidDtype.construct_from_string("uuid[7]").version
+        7
+        >>> UuidDtype.construct_from_string("uuid").version is None
+        True
+
+        """
+        if not isinstance(string, str):
+            msg = f"'construct_from_string' expects a string, got {type(string)}"
+            raise TypeError(msg)
+        if (match := _DTYPE_STRING_RE.fullmatch(string)) is None:
+            msg = f"Cannot construct a 'UuidDtype' from {string!r}"
+            raise TypeError(msg)
+        version = cast("str| None", match["version"])
+        try:
+            return cls(version=None if version is None else int(version))
+        except ValueError as e:
+            msg = f"Cannot construct a 'UuidDtype' from {string!r}: {e}"
+            raise TypeError(msg) from e
 
     # ExtensionDtype overrides
 
@@ -204,7 +255,19 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
         rng: int | np.random.Generator | None = None,
         dtype: UuidDtype | None = None,
     ) -> Self:
-        """Generate an array of random UUIDs."""
+        """Generate an array of random UUIDs.
+
+        Which version is generated comes from ``dtype.version``, defaulting to 4.
+        Only versions 4 and 7 can be generated randomly.
+
+        Examples
+        --------
+        >>> UuidArray.random(2, rng=0)[0].version
+        4
+        >>> UuidArray.random(2, rng=0, dtype=UuidDtype("numpy", 7))[0].version
+        7
+
+        """
 
 
 class UuidArray(BaseUuidArray, NumpyExtensionArray):
@@ -241,19 +304,22 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
         # we treat object arrays as sequences (we can’t efficiently convert)
         if isinstance(values, np.ndarray) and values.dtype.kind != "O":
-            values = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
+            values = values.astype(NP_STORAGE_DTYPE, copy=copy)
         else:
             # TODO: make construction from elements more efficient
             #       (both numpy and pyarrow)
             # https://github.com/scverse/pandas-uuid/issues/2
             values = np.array(
                 [_to_uuid_numpy(x).bytes for x in values],
-                dtype=_UUID_NP_STORAGE_DTYPE,
+                dtype=NP_STORAGE_DTYPE,
             )
 
         if values.ndim != 1:
             msg = "Array only supports 1-dimensional arrays"
             raise ValueError(msg)
+
+        if dtype is not None and dtype.version is not None:
+            check_version(values, dtype.version)
 
         NDArrayBackedExtensionArray.__init__(
             self, values, UuidDtype(storage="numpy") if dtype is None else dtype
@@ -325,10 +391,10 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         return super()._simple_new(values, dtype=dtype)
 
     def _from_backing_data(self, values: NDArray[np.void]) -> Self:
-        if values.dtype != _UUID_NP_STORAGE_DTYPE:
+        if values.dtype != NP_STORAGE_DTYPE:
             name = type(self).__name__
             msg = (
-                f"{name!r} only supports `values.dtype=='{_UUID_NP_STORAGE_DTYPE}'`, "
+                f"{name!r} only supports `values.dtype=='{NP_STORAGE_DTYPE}'`, "
                 f"not {values.dtype}"
             )
             raise ValueError(msg)
@@ -384,20 +450,12 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         rng: int | Generator | None = None,
         dtype: UuidDtype | None = None,
     ) -> Self:
-        if dtype is not None and dtype.version != 4:  # noqa: PLR2004
-            msg = "Only UUID version 4 is supported"
-            raise RuntimeError(msg)
-        rng = np.random.default_rng(rng)
-        array = rng.integers(0, 2**32, size=size * 4, dtype=np.uint32).view(
-            _UUID_NP_STORAGE_DTYPE
-        )
-        # https://datatracker.ietf.org/doc/html/rfc9562.html#section-5.8
-        bits(array)[48:52] = 0b0100  # set first four bits of byte 6 to (UUID version) 4
-        bits(array)[64:66] = 0b10  # set first two bits of byte 8 to (UUID variant) 2
-        return cls._simple_new(array, dtype)
+        values = random_values(size, version_for(dtype), rng)
+        return cls._simple_new(values, dtype)
 
 
-class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
+# `take` differs between our two bases, and pandas is fine with that
+class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-method-override]
     """Extension array for storing uuid data in a :class:`pyarrow.ChunkedArray`."""
 
     _pa_array: pa.ChunkedArray[pa.UuidScalar]
@@ -454,6 +512,8 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             )
             self._pa_array = pa.chunked_array([chunk])  # ty:ignore[invalid-assignment]
         self._dtype = dtype if dtype is not None else UuidDtype("pyarrow")
+        if self._dtype.version is not None:
+            check_version(arrow_to_void(self._pa_array), self._dtype.version)
 
     # ExtensionArray essential API (11 class attrs and methods)
 
@@ -560,14 +620,8 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
     ) -> Self:
         import pyarrow as pa
 
-        if dtype is not None and dtype.version != 4:  # noqa: PLR2004
-            msg = "Only UUID version 4 is supported"
-            raise RuntimeError(msg)
-
         # pyarrow’s random generator only does non-NaN floats, we want unbiased
-        rng = np.random.default_rng(rng)
-        values = rng.bytes(size * 16)
-        buf_vals = pa.py_buffer(values)
-        # TODO: set v4 bits  # noqa: TD003
-        arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])
+        values = random_values(size, version_for(dtype), rng)
+        # zero-copy: py_buffer keeps `values` alive
+        arr = pa.Array.from_buffers(pa.uuid(), size, [None, pa.py_buffer(values)])
         return cls(cast("pa.UuidArray", arr), dtype=dtype)

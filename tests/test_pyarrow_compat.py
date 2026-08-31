@@ -35,7 +35,7 @@ def test_pandas_to_pyarrow(
     pd_arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
 
     to_pa = dict(array=pa.array, from_pandas=pa.Array.from_pandas)[api]
-    pa_arr = to_pa(pd_arr)  # pyright: ignore[reportArgumentType, reportCallIssue]
+    pa_arr = to_pa(pd_arr)  # ty:ignore[no-matching-overload]
 
     assert pa_arr.type == pa.uuid()
     assert [e.as_py() for e in pa_arr] == list(pd_arr)
