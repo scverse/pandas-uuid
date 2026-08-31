@@ -241,7 +241,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
         # we treat object arrays as sequences (we can’t efficiently convert)
         if isinstance(values, np.ndarray) and values.dtype.kind != "O":
-            values = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)  # ty:ignore[no-matching-overload]
+            values = values.astype(_UUID_NP_STORAGE_DTYPE, copy=copy)
         else:
             # TODO: make construction from elements more efficient
             #       (both numpy and pyarrow)
@@ -435,7 +435,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             self._pa_array = (  # ty:ignore[invalid-assignment]
                 pa.chunked_array([values.view(pa.uuid())])
                 if isinstance(values, pa.Array)
-                else values.cast(pa.uuid())  # ty:ignore[no-matching-overload]
+                else values.cast(pa.uuid())
             )
         else:
             # TODO: make construction from elements more efficient
@@ -539,7 +539,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
             cmp_target = _to_uuid_pyarrow(other)
         else:
             if not isinstance(other, ArrowUuidArray):
-                other = ArrowUuidArray(other)  # ty:ignore[invalid-argument-type]
+                other = ArrowUuidArray(other)
             cmp_target = other._pa_array
 
         result = ARROW_CMP_FUNCS[op.__name__](
@@ -569,5 +569,5 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):
         values = rng.bytes(size * 16)
         buf_vals = pa.py_buffer(values)
         # TODO: set v4 bits  # noqa: TD003
-        arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])  # ty:ignore[invalid-argument-type]
+        arr = pa.Array.from_buffers(pa.uuid(), size, [None, buf_vals])
         return cls(cast("pa.UuidArray", arr), dtype=dtype)
