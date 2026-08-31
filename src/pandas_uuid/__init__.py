@@ -154,7 +154,7 @@ class UuidDtype(ExtensionDtype):
     @cached_property
     @override
     def na_value(self) -> NAType:  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Returns :attr:`pandas.NA`, i.e. this dtype has missing value semantics."""
+        """Returns :data:`pandas.NA`, i.e. this dtype has missing value semantics."""
         return pd.NA
 
     # IO
