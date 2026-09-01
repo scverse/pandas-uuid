@@ -27,7 +27,6 @@ from ._versions import (
     arrow_to_void,
     check_version,
     random_values,
-    version_for,
 )
 
 if TYPE_CHECKING:
@@ -425,7 +424,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
     def __arrow_array__(
         self,
-        type: _DT | None = None,  # noqa: A002
+        type: _DT | pa.UuidType | None = None,  # noqa: A002
     ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
         """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
 
@@ -435,7 +434,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         import pyarrow as pa
 
         if type is None:
-            type = pa.uuid()  # ty:ignore[invalid-assignment]  # noqa: A001
+            type = pa.uuid()  # noqa: A001
 
         return pa.array(self._ndarray, type=type)  # ty:ignore[invalid-return-type]
 
@@ -450,7 +449,9 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         rng: int | Generator | None = None,
         dtype: UuidDtype | None = None,
     ) -> Self:
-        values = random_values(size, version_for(dtype), rng)
+        if dtype is None:
+            dtype = UuidDtype(storage="numpy", version=4)
+        values = random_values(size, dtype.version, rng)
         return cls._simple_new(values, dtype)
 
 
@@ -576,7 +577,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
 
     @override
     @classmethod
-    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # ty:ignore[invalid-method-override]
+    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:
         if len(to_concat) == 0:
             return cls([])
         import pyarrow as pa
@@ -620,8 +621,10 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
     ) -> Self:
         import pyarrow as pa
 
+        if dtype is None:
+            dtype = UuidDtype(storage="pyarrow", version=4)
         # pyarrow’s random generator only does non-NaN floats, we want unbiased
-        values = random_values(size, version_for(dtype), rng)
+        values = random_values(size, dtype.version, rng)
         # zero-copy: py_buffer keeps `values` alive
         arr = pa.Array.from_buffers(pa.uuid(), size, [None, pa.py_buffer(values)])
         return cls(cast("pa.UuidArray", arr), dtype=dtype)
