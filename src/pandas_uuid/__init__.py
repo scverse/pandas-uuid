@@ -393,12 +393,8 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     @override
     @classmethod
-    def _simple_new(
-        cls, values: NDArray[np.void], dtype: UuidDtype | None = None
-    ) -> Self:  # ty:ignore[invalid-method-override]
-        if dtype is None:
-            dtype = UuidDtype(storage="numpy")
-        elif not isinstance(dtype, UuidDtype) or dtype.storage != "numpy":
+    def _simple_new(cls, values: NDArray[np.void], dtype: UuidDtype) -> Self:  # ty:ignore[invalid-method-override]
+        if not isinstance(dtype, UuidDtype) or dtype.storage != "numpy":
             msg = (
                 f"{type(cls).__name__!r} only supports `UuidDtype(storage='numpy')`, "
                 f"not {dtype}"
