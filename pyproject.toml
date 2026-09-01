@@ -126,6 +126,7 @@ lint.per-file-ignores."tests/*" = [
 ]
 lint.allowed-confusables = ["×", "’", "–"]
 lint.flake8-copyright.notice-rgx = "SPDX-License-Identifier: MPL-2\\.0"
+lint.flake8-tidy-imports.banned-api."pytest.importorskip".msg = "Skip declaratively: use `pytestmark = ` or `@pytest.mark.skipif(...)`"
 lint.isort.known-first-party = ["pandas_uuid"]
 lint.isort.required-imports = ["from __future__ import annotations"]
 lint.pylint.max-args = 7
