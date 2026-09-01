@@ -36,11 +36,12 @@ or by using the ``storage`` parameter of `UuidDtype`:
 >>> cls.random(2, rng=42)
 <UuidArray>
 [8826d916-cdfb-41c6-81ff-91a761565a70, 2416da6e-c212-4ddb-8d88-00160eb686b2]
-Length: 2, dtype: uuid
+Length: 2, dtype: uuid[4]
 
 ..  note::
     There is probably no good reason to ever set ``rng``
-    to a static seed apart from testing.
+    to a static seed apart from testing, as numpy doesn’t guarantee
+    reproducibility of random number generation across versions.
 
 .. usage-end
 

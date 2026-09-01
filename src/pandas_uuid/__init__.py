@@ -7,7 +7,7 @@ import abc
 import re
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cache, cached_property
 from importlib.util import find_spec
 from typing import TYPE_CHECKING, Literal, TypeVar, cast, get_args, overload, override
@@ -27,7 +27,6 @@ from ._versions import (
     arrow_to_void,
     check_version,
     random_values,
-    version_for,
 )
 
 if TYPE_CHECKING:
@@ -43,7 +42,7 @@ if TYPE_CHECKING:
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
 
     from pandas._libs.missing import NAType
-    from pandas._typing import ScalarIndexer, SequenceIndexer
+    from pandas._typing import DtypeObj, ScalarIndexer, SequenceIndexer
     from pandas.arrays import BooleanArray
 
 
@@ -213,6 +212,17 @@ class UuidDtype(ExtensionDtype):
         """Returns :data:`pandas.NA`, i.e. this dtype has missing value semantics."""
         return pd.NA
 
+    @override
+    def _get_common_dtype(self, dtypes: list[DtypeObj]) -> DtypeObj | None:
+        """Return the common dtype for e.g. concat (dropping mixed UUID versions)."""
+        if any(
+            not isinstance(d, UuidDtype) or d.storage != self.storage for d in dtypes
+        ):
+            return None
+        if all(cast("UuidDtype", d).version == self.version for d in dtypes):
+            return self
+        return replace(self, version=None)
+
     # IO
 
     def __from_arrow__(self, array: pa.Array | pa.ChunkedArray) -> ArrowExtensionArray:
@@ -224,6 +234,12 @@ class UuidDtype(ExtensionDtype):
         See :ref:`pyarrow-integration` for an example.
         """
         return ArrowUuidArray(array)
+
+
+def _concat_dtype(to_concat: Sequence[BaseUuidArray]) -> UuidDtype:
+    """Return the common dtype of arrays being concatenated (storage always matches)."""
+    dtype = to_concat[0].dtype
+    return cast("UuidDtype", dtype._get_common_dtype([x.dtype for x in to_concat]))  # noqa: SLF001
 
 
 class BaseUuidArray(ExtensionArray, abc.ABC):
@@ -353,7 +369,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
             elem = cast("np.void", self._ndarray[item])
             return UUID(bytes=elem.tobytes())
         item = check_array_indexer(self, item)
-        return self._simple_new(self._ndarray[item])
+        return self._simple_new(self._ndarray[item], self.dtype)
 
     # TODO: def __setitem__(self, index, value)
     # https://github.com/scverse/pandas-uuid/issues/15
@@ -371,18 +387,14 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         if len(to_concat) == 0:
             return cls([])
         values = np.concatenate([x._ndarray for x in to_concat])  # noqa: SLF001
-        return cls._simple_new(values)
+        return cls._simple_new(values, _concat_dtype(to_concat))
 
     # Helpers
 
     @override
     @classmethod
-    def _simple_new(
-        cls, values: NDArray[np.void], dtype: UuidDtype | None = None
-    ) -> Self:  # ty:ignore[invalid-method-override]
-        if dtype is None:
-            dtype = UuidDtype(storage="numpy")
-        elif not isinstance(dtype, UuidDtype) or dtype.storage != "numpy":
+    def _simple_new(cls, values: NDArray[np.void], dtype: UuidDtype) -> Self:  # ty:ignore[invalid-method-override]
+        if not isinstance(dtype, UuidDtype) or dtype.storage != "numpy":
             msg = (
                 f"{type(cls).__name__!r} only supports `UuidDtype(storage='numpy')`, "
                 f"not {dtype}"
@@ -425,7 +437,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
     def __arrow_array__(
         self,
-        type: _DT | None = None,  # noqa: A002
+        type: _DT | pa.UuidType | None = None,  # noqa: A002
     ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
         """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
 
@@ -435,7 +447,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         import pyarrow as pa
 
         if type is None:
-            type = pa.uuid()  # ty:ignore[invalid-assignment]  # noqa: A001
+            type = pa.uuid()  # noqa: A001
 
         return pa.array(self._ndarray, type=type)  # ty:ignore[invalid-return-type]
 
@@ -450,7 +462,9 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         rng: int | Generator | None = None,
         dtype: UuidDtype | None = None,
     ) -> Self:
-        values = random_values(size, version_for(dtype), rng)
+        if dtype is None:
+            dtype = UuidDtype(storage="numpy", version=4)
+        values = random_values(size, dtype.version, rng)
         return cls._simple_new(values, dtype)
 
 
@@ -566,7 +580,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
                 msg = f"Unexpected indexer type: {type(item)}"
                 raise AssertionError(msg)
 
-        return type(self)(values)
+        return self._from_pyarrow_array(values)
 
     # TODO: def __setitem__(self, index, value)
     # https://github.com/scverse/pandas-uuid/issues/15
@@ -576,7 +590,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
 
     @override
     @classmethod
-    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # ty:ignore[invalid-method-override]
+    def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:
         if len(to_concat) == 0:
             return cls([])
         import pyarrow as pa
@@ -585,10 +599,22 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
         values = pa.chunked_array(
             [chunk for x in to_concat for chunk in x._pa_array.chunks]  # noqa: SLF001
         )
-        return cls(values)  # ty:ignore[invalid-argument-type]
+        return to_concat[0]._from_pyarrow_array(values, _concat_dtype(to_concat))  # ty:ignore[invalid-argument-type]  # noqa: SLF001
 
     # Helpers
 
+    @override
+    def _from_pyarrow_array(
+        self,
+        pa_array: pa.Array[pa.UuidScalar] | pa.ChunkedArray[pa.UuidScalar],
+        dtype: UuidDtype | None = None,
+    ) -> Self:
+        """Wrap `pa_array` derived from this array, preserving dtype in e.g. `.copy`."""
+        new = type(self)(pa_array)
+        new._dtype = self.dtype if dtype is None else dtype  # noqa: SLF001
+        return new
+
+    @override
     def _cmp_method(
         self, other: Sequence[UuidLike] | BaseUuidArray | UuidLike, op: FunctionType
     ) -> BooleanArray:  # ty:ignore[invalid-method-override]
@@ -620,8 +646,10 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
     ) -> Self:
         import pyarrow as pa
 
+        if dtype is None:
+            dtype = UuidDtype(storage="pyarrow", version=4)
         # pyarrow’s random generator only does non-NaN floats, we want unbiased
-        values = random_values(size, version_for(dtype), rng)
+        values = random_values(size, dtype.version, rng)
         # zero-copy: py_buffer keeps `values` alive
         arr = pa.Array.from_buffers(pa.uuid(), size, [None, pa.py_buffer(values)])
         return cls(cast("pa.UuidArray", arr), dtype=dtype)

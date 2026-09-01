@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from numpy.random import Generator
     from numpy.typing import NDArray
 
-    from . import UuidDtype
     from . import _pyarrow as pa
 
 
@@ -71,15 +70,12 @@ def arrow_to_void(array: pa.ChunkedArray[pa.UuidScalar]) -> NDArray[np.void]:
     return values[combined.is_valid().to_numpy(zero_copy_only=False)]
 
 
-def version_for(dtype: UuidDtype | None) -> int:
-    """Version to generate: the one `dtype` specifies, else 4."""
-    return 4 if dtype is None or dtype.version is None else dtype.version
-
-
 def random_values(
-    size: int, version: int, rng: int | Generator | None
+    size: int, version: int | None, rng: int | Generator | None
 ) -> NDArray[np.void]:
     """Generate `size` random UUIDs of `version` as 16-byte void records."""
+    if version is None:
+        version = 4
     if version not in RANDOM_VERSIONS:
         msg = (
             f"Can only generate random UUIDs of version "

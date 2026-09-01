@@ -7,12 +7,18 @@ import time
 from typing import TYPE_CHECKING
 from uuid import uuid1, uuid4
 
+import pandas as pd
 import pytest
 
 from pandas_uuid import UuidDtype
+from pandas_uuid._pyarrow import HAS_PYARROW
 
 if TYPE_CHECKING:
-    from pandas_uuid import UuidStorage
+    from collections.abc import Callable
+
+    from pandas.api.extensions import ExtensionArray
+
+    from pandas_uuid import ArrowUuidArray, UuidArray, UuidStorage
 
 
 # dtype
@@ -111,3 +117,58 @@ def test_construct_version_unspecified(storage: UuidStorage) -> None:
     dtype = UuidDtype(storage)
     arr = dtype.construct_array_type()([uuid4(), uuid1()], dtype=dtype)
     assert arr.dtype.version is None
+
+
+# operations
+
+
+def _random(
+    storage: UuidStorage, version: int | None, rng: int
+) -> UuidArray | ArrowUuidArray:
+    dtype = UuidDtype(storage, version)
+    return dtype.construct_array_type().random(2, rng=rng, dtype=dtype)
+
+
+@pytest.mark.parametrize(
+    ("versions", "expected"),
+    [
+        pytest.param((4, 4), 4, id="same"),
+        pytest.param((4, 7), None, id="mismatch"),
+        pytest.param((4, None), None, id="unversioned"),
+    ],
+)
+def test_concat_version(
+    storage: UuidStorage, versions: tuple[int | None, ...], expected: int | None
+) -> None:
+    """Concatenation keeps a shared version and drops mismatched ones."""
+    arrays = [_random(storage, version, i) for i, version in enumerate(versions)]
+
+    concat = type(arrays[0])._concat_same_type(arrays)  # ty:ignore[invalid-argument-type]  # noqa: SLF001
+    assert concat.dtype == UuidDtype(storage, expected)
+    assert concat.tolist() == [uuid for arr in arrays for uuid in arr]
+
+    series = pd.concat([pd.Series(arr) for arr in arrays])
+    assert series.dtype == UuidDtype(storage, expected)
+    assert series.tolist() == concat.tolist()
+
+
+@pytest.mark.skipif(not HAS_PYARROW, reason="pyarrow is not installed")
+def test_concat_mixed_storage() -> None:
+    """Storage kinds can’t be mixed, so pandas falls back to object."""
+    series = [pd.Series(_random(storage, 4, 0)) for storage in ("numpy", "pyarrow")]
+    assert pd.concat(series).dtype == object
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        pytest.param(lambda arr: arr.copy(), id="copy"),
+        pytest.param(lambda arr: arr[:1], id="slice"),
+        pytest.param(lambda arr: arr.take([0]), id="take"),
+        pytest.param(lambda arr: pd.Series(arr).array, id="series"),
+    ],
+)
+def test_subset_keeps_version(
+    storage: UuidStorage, op: Callable[[UuidArray | ArrowUuidArray], ExtensionArray]
+) -> None:
+    assert op(_random(storage, 7, 0)).dtype == UuidDtype(storage, 7)
