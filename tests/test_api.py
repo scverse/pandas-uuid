@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import warnings
 from itertools import batched, product
 from typing import TYPE_CHECKING, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 import pandas as pd
@@ -17,8 +18,8 @@ from pandas_uuid._pyarrow import HAS_PYARROW
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Literal
-    from uuid import UUID
 
+    from numpy.typing import DTypeLike
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
     from pandas_uuid import UuidLike, UuidStorage
@@ -107,6 +108,11 @@ def test_take(
 
 def test_take_fill(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
     if storage == "numpy":
+        warnings.filterwarnings(
+            "ignore",
+            r"reindexing with a fill_value that cannot be held",
+            pd.errors.Pandas4Warning,
+        )
         request.applymarker(pytest.mark.xfail(raises=ValueError))
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     result = arr.take([1, -1], allow_fill=True).tolist()
@@ -207,6 +213,59 @@ def test_copy(subtests: pytest.Subtests, storage: UuidStorage) -> None:
             assert arr.tolist() == data
 
 
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        pytest.param(str, id="str"),
+        pytest.param("string", id="string"),
+        pytest.param("U", id="U"),
+        pytest.param(np.dtypes.StringDType(), id="T"),
+        pytest.param(np.dtypes.StringDType(na_object=None), id="T-na"),
+    ],
+)
+def test_as_str(storage: UuidStorage, dtype: DTypeLike) -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
+    assert all(isinstance(x, UUID) for x in arr)
+    res = arr.astype(dtype)
+    expected = np.dtype("U36") if dtype == "U" else pd.api.types.pandas_dtype(dtype)
+    assert res.dtype == expected
+    assert res.tolist() == [str(x) for x in arr]
+
+
+@pytest.mark.parametrize(
+    ("dtype", "na"),
+    [
+        pytest.param(str, np.nan, id="str"),
+        pytest.param("string", pd.NA, id="string"),
+        pytest.param(np.dtypes.StringDType(na_object=None), None, id="T-none"),
+        pytest.param(np.dtypes.StringDType(na_object=np.nan), np.nan, id="T-nan"),
+    ],
+)
+def test_as_str_na(
+    storage: UuidStorage,
+    xfail_if_numpy_and_na: Callable[..., None],
+    dtype: DTypeLike,
+    na: object,
+) -> None:
+    values = [None, u := uuid4()]
+    xfail_if_numpy_and_na(values)
+    res = pd.array(values, dtype=UuidDtype(storage)).astype(dtype)
+    assert type(res[0]) is type(na)
+    assert pd.isna(res[0])
+    assert res[1] == str(u)
+
+
+@skipif_no_pyarrow
+@pytest.mark.parametrize(
+    "dtype",
+    [pytest.param("U", id="U"), pytest.param(np.dtypes.StringDType(), id="T")],
+)
+def test_as_str_na_unsupported(dtype: DTypeLike) -> None:
+    arr = pd.array([None, uuid4()], dtype=UuidDtype("pyarrow"))
+    with pytest.raises(ValueError, match=r"no NA value"):
+        arr.astype(dtype)
+
+
 def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
     dtype = UuidDtype(storage)
     batch_len = 4
@@ -215,7 +274,7 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
     ]
     concat = dtype.construct_array_type()._concat_same_type(arrays)  # ty:ignore[invalid-argument-type]  # noqa: SLF001
     for i, (expected, batch) in enumerate(
-        zip(arrays, batched(concat, batch_len), strict=True)
+        zip(arrays, batched(concat, batch_len, strict=True), strict=True)
     ):
         with subtests.test(i=i):
             assert list(batch) == expected.tolist()
@@ -253,4 +312,5 @@ def test_repr(
             expected = f"Index([{data[0]}, {data[1]}], dtype='uuid')"
         case pd.Series():
             expected = f"0    {data[0]}\n1    {data[1]!s:>36}\ndtype: uuid"
-    assert repr(arr) == expected
+    with pd.option_context("display.width", 200):  # pandas 3.1 wraps Index
+        assert repr(arr) == expected

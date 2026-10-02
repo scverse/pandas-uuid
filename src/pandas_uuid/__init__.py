@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import abc
 import re
-import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from functools import cache, cached_property
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Literal, TypeVar, cast, get_args, overload, override
+from typing import TYPE_CHECKING, Literal, cast, get_args, overload, override
 from uuid import UUID
 
 import numpy as np
@@ -37,7 +36,8 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
     from numpy.random import Generator
-    from numpy.typing import NDArray
+    from numpy.typing import DTypeLike, NDArray
+    from pandas.api.typing.aliases import ArrayLike
 
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
 
@@ -62,11 +62,6 @@ type UuidLike = UUID | pa.UuidScalar | bytes | int | str
 """Supported element types when creating a :class:`~pandas_uuid.BaseUuidArray` \
 from a sequence.
 """
-
-if TYPE_CHECKING or sys.version_info >= (3, 13):
-    _DT = TypeVar("_DT", bound="pa.DataType", default=pa.UuidType)  # ty:ignore[invalid-legacy-type-variable]
-else:  # pragma: no cover
-    _DT = TypeVar("_DT", bound="pa.DataType")
 
 _DTYPE_STRING_RE = re.compile(r"uuid(?:\[(?P<version>\d+)\])?")
 
@@ -260,6 +255,48 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
         # so we need to convert it back.
         return lambda b: str(b if pd.isna(b) else _to_uuid_numpy(b))
 
+    @overload
+    def astype(self, dtype: DTypeLike, copy: bool = True) -> np.ndarray: ...  # noqa: FBT001, FBT002
+    @overload
+    def astype(self, dtype: ExtensionDtype, copy: bool = True) -> ExtensionArray: ...  # noqa: FBT001, FBT002
+    @overload
+    def astype(
+        self,
+        dtype: DTypeLike | ExtensionDtype,
+        copy: bool = True,  # noqa: FBT001, FBT002
+    ) -> ArrayLike: ...
+    @override
+    def astype(self, dtype: DTypeLike | ExtensionDtype, copy: bool = True) -> ArrayLike:
+        dtype = pd.api.types.pandas_dtype(dtype)
+        if isinstance(dtype, pd.StringDtype):
+            return pd.array(self._to_str(dtype.na_value), dtype=dtype)
+        if isinstance(dtype, np.dtype) and dtype.kind in {"U", "T"}:
+            if hasattr(dtype, "na_object"):
+                return self._to_str(dtype.na_object).astype(dtype, copy=False)
+            if np.asarray(self.isna()).any():
+                msg = f"Cannot convert missing values to {dtype!r}, it has no NA value."
+                raise ValueError(msg)
+            return self._to_str().astype(dtype, copy=False)
+        return super().astype(dtype, copy=copy)
+
+    def _to_str(self, na_value: object = None) -> NDArray[np.object_]:
+        """Canonical UUID strings, with `na_value` for missing values."""
+        hexed = np.frombuffer(
+            self._valid_void().tobytes().hex().encode(), dtype="S1"
+        ).reshape(-1, 32)
+        dashed = np.insert(hexed, [8, 12, 16, 20], b"-", axis=1)
+        strs = dashed.view("S36").ravel().astype("U36")
+
+        if (valid := ~np.asarray(self.isna())).all():
+            return strs
+        out = np.full(len(self), na_value, dtype=object)
+        out[valid] = strs
+        return out
+
+    @abc.abstractmethod
+    def _valid_void(self) -> NDArray[np.void]:
+        """Non-null elements as 16-byte void records."""
+
     # Custom API
 
     @classmethod
@@ -382,6 +419,10 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         return np.zeros(len(self), dtype=bool)
 
     @override
+    def _valid_void(self) -> NDArray[np.void]:
+        return self._ndarray
+
+    @override
     @classmethod
     def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # ty:ignore[invalid-method-override]
         if len(to_concat) == 0:
@@ -434,11 +475,13 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     @overload
     def __arrow_array__(self, type: pa.UuidType | None = None) -> pa.UuidArray: ...
     @overload
-    def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
-    def __arrow_array__(
+    def __arrow_array__[DT: pa.DataType = pa.UuidType](
+        self, type: DT
+    ) -> pa.Array[pa.Scalar[DT]]: ...
+    def __arrow_array__[DT: pa.DataType = pa.UuidType](
         self,
-        type: _DT | pa.UuidType | None = None,  # noqa: A002
-    ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
+        type: DT | pa.UuidType | None = None,  # noqa: A002
+    ) -> pa.Array[pa.Scalar[DT]] | pa.ChunkedArray[pa.Scalar[DT]]:
         """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
 
         See :ref:`pyarrow-integration` for an example
@@ -474,6 +517,10 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
 
     _pa_array: pa.ChunkedArray[pa.UuidScalar]
     _dtype: UuidDtype
+
+    @override
+    def _valid_void(self) -> NDArray[np.void]:
+        return arrow_to_void(self._pa_array)
 
     def __init__(
         self,
