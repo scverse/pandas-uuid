@@ -11,7 +11,7 @@ requires = [
 name = "pandas-uuid"
 license = "MPL-2.0"
 authors = [{ name = "Philipp A.", email = "flying-sheep@web.de" }]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dynamic = ["description", "readme", "version"]
 dependencies = ["numpy", "pandas"]
 optional-dependencies.pyarrow = ["pyarrow"]
@@ -54,10 +54,10 @@ scripts.open = "python -m webbrowser -t docs/_build/html/index.html"
 scripts.clean = "git clean -fdX -- {args:docs}"
 
 [[tool.hatch.envs.hatch-test.matrix]]
-python = ["3.14", "3.12"]
+python = ["3.14", "3.13"]
 extras = ["pyarrow", "none"]
 [[tool.hatch.envs.hatch-test.matrix]]
-python = ["3.14"]
+python = ["3.15"]
 extras = ["pyarrow"]
 deps = ["pre"]
 [tool.hatch.envs.hatch-test]
@@ -75,6 +75,9 @@ matrix.extras.env-vars = [
 ]
 matrix.deps.env-vars = [
   { key = "UV_PRERELEASE", value = "allow", if = [
+    "pre",
+  ] },
+  { key = "UV_FIND_LINKS", value = "https://pypi.anaconda.org/scientific-python-nightly-wheels/simple/pyarrow/", if = [
     "pre",
   ] },
 ]

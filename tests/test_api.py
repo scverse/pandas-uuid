@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from itertools import batched, product
 from typing import TYPE_CHECKING, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,6 @@ from pandas_uuid._pyarrow import HAS_PYARROW
 if TYPE_CHECKING:
     from collections.abc import Callable
     from typing import Any, Literal
-    from uuid import UUID
 
     from pandas._typing import ScalarIndexer, SequenceIndexer, TakeIndexer
 
@@ -207,6 +206,12 @@ def test_copy(subtests: pytest.Subtests, storage: UuidStorage) -> None:
             assert arr.tolist() == data
 
 
+def test_as_str(storage: UuidStorage) -> None:
+    arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
+    assert all(isinstance(x, UUID) for x in arr)
+    assert arr.astype(str).tolist() == [str(x) for x in arr]
+
+
 def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
     dtype = UuidDtype(storage)
     batch_len = 4
@@ -215,7 +220,7 @@ def test_concat(subtests: pytest.Subtests, storage: UuidStorage) -> None:
     ]
     concat = dtype.construct_array_type()._concat_same_type(arrays)  # ty:ignore[invalid-argument-type]  # noqa: SLF001
     for i, (expected, batch) in enumerate(
-        zip(arrays, batched(concat, batch_len), strict=True)
+        zip(arrays, batched(concat, batch_len, strict=True), strict=True)
     ):
         with subtests.test(i=i):
             assert list(batch) == expected.tolist()

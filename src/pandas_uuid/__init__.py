@@ -5,12 +5,11 @@ from __future__ import annotations
 
 import abc
 import re
-import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from functools import cache, cached_property
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Literal, TypeVar, cast, get_args, overload, override
+from typing import TYPE_CHECKING, Literal, cast, get_args, overload, override
 from uuid import UUID
 
 import numpy as np
@@ -37,7 +36,8 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
     from numpy.random import Generator
-    from numpy.typing import NDArray
+    from numpy.typing import DTypeLike, NDArray
+    from pandas.api.typing.aliases import ArrayLike
 
     npt._ArrayLikeInt_co = None  # type: ignore  # noqa: PGH003, SLF001
 
@@ -63,10 +63,6 @@ type UuidLike = UUID | pa.UuidScalar | bytes | int | str
 from a sequence.
 """
 
-if TYPE_CHECKING or sys.version_info >= (3, 13):
-    _DT = TypeVar("_DT", bound="pa.DataType", default=pa.UuidType)  # ty:ignore[invalid-legacy-type-variable]
-else:  # pragma: no cover
-    _DT = TypeVar("_DT", bound="pa.DataType")
 
 _DTYPE_STRING_RE = re.compile(r"uuid(?:\[(?P<version>\d+)\])?")
 
@@ -260,6 +256,23 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
         # so we need to convert it back.
         return lambda b: str(b if pd.isna(b) else _to_uuid_numpy(b))
 
+    @overload
+    def astype(self, dtype: DTypeLike, copy: bool = True) -> np.ndarray: ...  # noqa: FBT001, FBT002
+    @overload
+    def astype(self, dtype: ExtensionDtype, copy: bool = True) -> ExtensionArray: ...  # noqa: FBT001, FBT002
+    @overload
+    def astype(
+        self,
+        dtype: DTypeLike | ExtensionDtype,
+        copy: bool = True,  # noqa: FBT001, FBT002
+    ) -> ArrayLike: ...
+    @override
+    def astype(self, dtype: DTypeLike | ExtensionDtype, copy: bool = True) -> ArrayLike:
+        dtype = pd.api.types.pandas_dtype(dtype)
+        if isinstance(dtype, pd.StringDtype) or dtype.kind in {"U", "T"}:
+            return self.map(self._formatter())
+        return super().astype(dtype, copy=copy)
+
     # Custom API
 
     @classmethod
@@ -434,11 +447,13 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
     @overload
     def __arrow_array__(self, type: pa.UuidType | None = None) -> pa.UuidArray: ...
     @overload
-    def __arrow_array__(self, type: _DT) -> pa.Array[pa.Scalar[_DT]]: ...
-    def __arrow_array__(
+    def __arrow_array__[DT: pa.DataType = pa.UuidType](
+        self, type: DT
+    ) -> pa.Array[pa.Scalar[DT]]: ...
+    def __arrow_array__[DT: pa.DataType = pa.UuidType](
         self,
-        type: _DT | pa.UuidType | None = None,  # noqa: A002
-    ) -> pa.Array[pa.Scalar[_DT]] | pa.ChunkedArray[pa.Scalar[_DT]]:
+        type: DT | pa.UuidType | None = None,  # noqa: A002
+    ) -> pa.Array[pa.Scalar[DT]] | pa.ChunkedArray[pa.Scalar[DT]]:
         """PyArrow extension API for :meth:`pyarrow.Array.from_pandas`.
 
         See :ref:`pyarrow-integration` for an example
