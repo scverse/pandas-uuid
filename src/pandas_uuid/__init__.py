@@ -269,13 +269,18 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
     def astype(self, dtype: DTypeLike | ExtensionDtype, copy: bool = True) -> ArrayLike:
         dtype = pd.api.types.pandas_dtype(dtype)
         if isinstance(dtype, pd.StringDtype):
-            return pd.array(self._to_str(), dtype=dtype)
+            return pd.array(self._to_str(dtype.na_value), dtype=dtype)
         if isinstance(dtype, np.dtype) and dtype.kind in {"U", "T"}:
+            if hasattr(dtype, "na_object"):
+                return self._to_str(dtype.na_object).astype(dtype, copy=False)
+            if np.asarray(self.isna()).any():
+                msg = f"Cannot convert missing values to {dtype!r}, it has no NA value."
+                raise ValueError(msg)
             return self._to_str().astype(dtype, copy=False)
         return super().astype(dtype, copy=copy)
 
-    def _to_str(self) -> NDArray[np.object_]:
-        """Canonical UUID strings, with `None` for missing values."""
+    def _to_str(self, na_value: object = None) -> NDArray[np.object_]:
+        """Canonical UUID strings, with `na_value` for missing values."""
         hexed = np.frombuffer(
             self._valid_void().tobytes().hex().encode(), dtype="S1"
         ).reshape(-1, 32)
@@ -284,7 +289,7 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
 
         if (valid := ~np.asarray(self.isna())).all():
             return strs
-        out = np.full(len(self), None, dtype=object)
+        out = np.full(len(self), na_value, dtype=object)
         out[valid] = strs
         return out
 
