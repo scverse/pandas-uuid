@@ -63,7 +63,6 @@ type UuidLike = UUID | pa.UuidScalar | bytes | int | str
 from a sequence.
 """
 
-
 _DTYPE_STRING_RE = re.compile(r"uuid(?:\[(?P<version>\d+)\])?")
 
 
@@ -269,9 +268,29 @@ class BaseUuidArray(ExtensionArray, abc.ABC):
     @override
     def astype(self, dtype: DTypeLike | ExtensionDtype, copy: bool = True) -> ArrayLike:
         dtype = pd.api.types.pandas_dtype(dtype)
-        if isinstance(dtype, pd.StringDtype) or dtype.kind in {"U", "T"}:
-            return self.map(self._formatter())
+        if isinstance(dtype, pd.StringDtype):
+            return pd.array(self._to_str(), dtype=dtype)
+        if isinstance(dtype, np.dtype) and dtype.kind in {"U", "T"}:
+            return self._to_str().astype(dtype, copy=False)
         return super().astype(dtype, copy=copy)
+
+    def _to_str(self) -> NDArray[np.object_]:
+        """Canonical UUID strings, with `None` for missing values."""
+        hexed = np.frombuffer(
+            self._valid_void().tobytes().hex().encode(), dtype="S1"
+        ).reshape(-1, 32)
+        dashed = np.insert(hexed, [8, 12, 16, 20], b"-", axis=1)
+        strs = dashed.view("S36").ravel().astype("U36")
+
+        if (valid := ~np.asarray(self.isna())).all():
+            return strs
+        out = np.full(len(self), None, dtype=object)
+        out[valid] = strs
+        return out
+
+    @abc.abstractmethod
+    def _valid_void(self) -> NDArray[np.void]:
+        """Non-null elements as 16-byte void records."""
 
     # Custom API
 
@@ -395,6 +414,10 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         return np.zeros(len(self), dtype=bool)
 
     @override
+    def _valid_void(self) -> NDArray[np.void]:
+        return self._ndarray
+
+    @override
     @classmethod
     def _concat_same_type(cls, to_concat: Sequence[Self]) -> Self:  # ty:ignore[invalid-method-override]
         if len(to_concat) == 0:
@@ -489,6 +512,10 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
 
     _pa_array: pa.ChunkedArray[pa.UuidScalar]
     _dtype: UuidDtype
+
+    @override
+    def _valid_void(self) -> NDArray[np.void]:
+        return arrow_to_void(self._pa_array)
 
     def __init__(
         self,

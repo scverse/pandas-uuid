@@ -209,6 +209,7 @@ def test_copy(subtests: pytest.Subtests, storage: UuidStorage) -> None:
 def test_as_str(storage: UuidStorage) -> None:
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     assert all(isinstance(x, UUID) for x in arr)
+    assert isinstance(arr.astype(str).dtype, pd.StringDtype)
     assert arr.astype(str).tolist() == [str(x) for x in arr]
 
 
