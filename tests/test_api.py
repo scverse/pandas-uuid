@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from itertools import batched, product
 from typing import TYPE_CHECKING, cast
 from uuid import UUID, uuid4
@@ -107,6 +108,11 @@ def test_take(
 
 def test_take_fill(request: pytest.FixtureRequest, storage: UuidStorage) -> None:
     if storage == "numpy":
+        warnings.filterwarnings(
+            "ignore",
+            r"reindexing with a fill_value that cannot be held",
+            pd.errors.Pandas4Warning,
+        )
         request.applymarker(pytest.mark.xfail(raises=ValueError))
     arr = pd.array([uuid4(), uuid4()], dtype=UuidDtype(storage))
     result = arr.take([1, -1], allow_fill=True).tolist()
@@ -306,4 +312,5 @@ def test_repr(
             expected = f"Index([{data[0]}, {data[1]}], dtype='uuid')"
         case pd.Series():
             expected = f"0    {data[0]}\n1    {data[1]!s:>36}\ndtype: uuid"
-    assert repr(arr) == expected
+    with pd.option_context("display.width", 200):  # pandas 3.1 wraps Index
+        assert repr(arr) == expected
