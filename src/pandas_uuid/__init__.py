@@ -330,7 +330,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     _typ = "extension"  # undo numpy extension array hack
     _ndarray: NDArray[np.void]
-    _dtype: UuidDtype
+    _dtype: UuidDtype  # ty: ignore[invalid-attribute-override]
 
     def __init__(
         self,
@@ -382,7 +382,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
 
     @override
     @property
-    def dtype(self) -> UuidDtype:
+    def dtype(self) -> UuidDtype:  # ty: ignore[invalid-property-type-override]
         return self._dtype
 
     @override
@@ -516,7 +516,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
     """Extension array for storing uuid data in a :class:`pyarrow.ChunkedArray`."""
 
     _pa_array: pa.ChunkedArray[pa.UuidScalar]
-    _dtype: UuidDtype
+    _dtype: UuidDtype  # ty: ignore[invalid-attribute-override]
 
     @override
     def _valid_void(self) -> NDArray[np.void]:
@@ -580,7 +580,7 @@ class ArrowUuidArray(BaseUuidArray, ArrowExtensionArray):  # ty:ignore[invalid-m
 
     @override
     @property
-    def dtype(self) -> UuidDtype:
+    def dtype(self) -> UuidDtype:  # ty: ignore[invalid-property-type-override]
         return self._dtype
 
     @override
