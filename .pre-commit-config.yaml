@@ -12,7 +12,7 @@ repos:
     types: [python]
     pass_filenames: false # whole-program analysis
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.17.0
+  rev: v0.17.1
   hooks:
   - id: ruff-check
     args: ["--fix"]
