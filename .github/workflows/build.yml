@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with: { filter: 'blob:none', fetch-depth: 0 }
+        with: { filter: "blob:none", fetch-depth: 0 }
       - name: Install uv
         uses: astral-sh/setup-uv@v7
       - name: Build package
