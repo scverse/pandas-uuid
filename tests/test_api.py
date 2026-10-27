@@ -181,6 +181,7 @@ def test_eq(
     )
 
     cmp = left_conv == right_conv
+    assert not isinstance(cmp, bool)
 
     arr_exp = pd.array(expected, dtype="boolean")
     pd.testing.assert_extension_array_equal(cmp, arr_exp, check_dtype=False)
