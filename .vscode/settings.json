@@ -4,7 +4,7 @@
         "source.fixAll": "explicit",
         "source.organizeImports": "explicit",
     },
-    "[python][json][jsonc]": {
+    "[python][json][jsonc][yaml]": {
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
             "source.fixAll": "always",
@@ -14,7 +14,7 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
     },
-    "[json][jsonc]": {
+    "[json][jsonc][yaml]": {
         "editor.defaultFormatter": "biomejs.biome",
     },
     "python.testing.pytestEnabled": true,
