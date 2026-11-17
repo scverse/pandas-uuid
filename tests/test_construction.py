@@ -35,7 +35,7 @@ def api(
 ) -> Callable[..., UuidArray | ArrowUuidArray]:
     match request.param, storage:
         case "pd.array", _:
-            return partial(pd.array, dtype=UuidDtype(storage))  # ty:ignore[invalid-return-type]
+            return partial(pd.array, dtype=UuidDtype(storage))  # ty:ignore[invalid-explicit-return]
         case "type", "numpy":
             return UuidArray
         case "type", "pyarrow":

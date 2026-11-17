@@ -492,7 +492,7 @@ class UuidArray(BaseUuidArray, NumpyExtensionArray):
         if type is None:
             type = pa.uuid()  # noqa: A001
 
-        return pa.array(self._ndarray, type=type)  # ty:ignore[invalid-return-type]
+        return pa.array(self._ndarray, type=type)  # ty:ignore[invalid-explicit-return]
 
     # Custom API
 
