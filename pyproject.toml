@@ -144,6 +144,7 @@ addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
   "--doctest-glob=*.rst",
+  "--ignore=docs/conf.py",
   "--ignore-glob=docs/extensions/**",
   "--ignore-glob=docs/_build/**",
   "-ptesting.pandas_uuid._pytest",
