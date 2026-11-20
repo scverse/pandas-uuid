@@ -21,13 +21,10 @@ urls.Documentation = "https://pandas-uuid.readthedocs.io/"
 [dependency-groups]
 doc = [
   "ipykernel",
-  "matplotlib",          # social cards
-  "pygments",            # code higlighting
-  "sphinx>=9.0.4",
-  "sphinx-book-theme",
-  "sphinx-copybutton",
-  "sphinx-tabs",
-  "sphinxext-opengraph",
+  "matplotlib",               # social cards
+  "pygments",                 # code higlighting
+  "scverse-doc[full]>=0.5.1",
+  "sphinx>=9.1",
 ]
 typing = ["pyarrow-stubs"]
 
