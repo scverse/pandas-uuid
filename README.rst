@@ -4,8 +4,8 @@
    :target: https://pypi.org/project/pandas-uuid/
 .. |coverage| image:: https://codecov.io/github/scverse/pandas-uuid/graph/badge.svg?token=R9HFDFPBID
    :target: https://codecov.io/github/scverse/pandas-uuid
-.. |docs| image:: https://app.readthedocs.com/projects/icb-pandas-uuid/badge/
-   :target: https://icb-pandas-uuid.readthedocs-hosted.com/
+.. |docs| image:: https://app.readthedocs.org/projects/icb-pandas-uuid/badge/
+   :target: https://pandas-uuid.readthedocs.io/
 .. |tests| image:: https://github.com/scverse/pandas-uuid/actions/workflows/test.yml/badge.svg
    :target: https://github.com/scverse/pandas-uuid/actions/workflows/test.yml
 
@@ -47,4 +47,4 @@ Length: 2, dtype: uuid[4]
 
 For advanced usage, see the Documentation_.
 
-.. _documentation: https://icb-pandas-uuid.readthedocs-hosted.com/en/latest/#usage
+.. _documentation: https://pandas-uuid.readthedocs.io/#usage

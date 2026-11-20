@@ -16,18 +16,15 @@ dynamic = ["description", "readme", "version"]
 dependencies = ["numpy", "pandas"]
 optional-dependencies.pyarrow = ["pyarrow"]
 urls.Source = "https://github.com/scverse/pandas-uuid"
-urls.Documentation = "https://icb-pandas-uuid.readthedocs.io/"
+urls.Documentation = "https://pandas-uuid.readthedocs.io/"
 
 [dependency-groups]
 doc = [
   "ipykernel",
-  "matplotlib",          # social cards
-  "pygments",            # code higlighting
-  "sphinx>=9.0.4",
-  "sphinx-book-theme",
-  "sphinx-copybutton",
-  "sphinx-tabs",
-  "sphinxext-opengraph",
+  "matplotlib",               # social cards
+  "pygments",                 # code higlighting
+  "scverse-doc[full]>=0.5.1",
+  "sphinx>=9.1",
 ]
 typing = ["pyarrow-stubs"]
 
@@ -147,6 +144,7 @@ addopts = [
   "--import-mode=importlib",
   "--doctest-modules",
   "--doctest-glob=*.rst",
+  "--ignore=docs/conf.py",
   "--ignore-glob=docs/extensions/**",
   "--ignore-glob=docs/_build/**",
   "-ptesting.pandas_uuid._pytest",
