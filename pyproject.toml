@@ -16,7 +16,7 @@ dynamic = ["description", "readme", "version"]
 dependencies = ["numpy", "pandas"]
 optional-dependencies.pyarrow = ["pyarrow"]
 urls.Source = "https://github.com/scverse/pandas-uuid"
-urls.Documentation = "https://icb-pandas-uuid.readthedocs.io/"
+urls.Documentation = "https://pandas-uuid.readthedocs.io/"
 
 [dependency-groups]
 doc = [
